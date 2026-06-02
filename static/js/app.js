@@ -1,6 +1,6 @@
 let reporte = null;
 let modalidadActiva = "Presencial";
-const registrosPorPagina = 15;
+const registrosPorPagina = 10;
 const paginasCurso = {};
 
 const $ = (selector) => document.querySelector(selector);
