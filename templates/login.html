@@ -12,18 +12,22 @@
         <div>
             <p class="eyebrow">Acceso seguro</p>
             <h1>Reporte integral de capacitaciones</h1>
-            <p class="subtitle">Ingresa con tu cuenta institucional de Google.</p>
+            <p class="subtitle">Ingresa la contraseña para consultar el reporte.</p>
         </div>
     </header>
 
     <main class="container narrow">
         <section class="section panel login-panel">
             <h2>Iniciar sesión</h2>
-            <p class="muted">Solo se permite el acceso con cuentas <strong>@{{ allowed_domain }}</strong>.</p>
+            <p class="muted">Este reporte es de consulta interna para el periodo actual.</p>
             {% if error %}
                 <div class="alert">{{ error }}</div>
             {% endif %}
-            <a class="btn google-btn" href="{{ url_for('login_google') }}">Continuar con Google</a>
+            <form method="post" class="form">
+                <label for="password">Contraseña</label>
+                <input id="password" name="password" type="password" required autofocus>
+                <button class="btn" type="submit">Entrar</button>
+            </form>
         </section>
     </main>
 </body>

@@ -14,12 +14,10 @@
             <h1>Reporte integral de capacitaciones</h1>
             <p class="subtitle">Resumen general, avance por modalidad y cursos completados.</p>
         </div>
-        {% if google_login_enabled and google_user %}
-            <div class="auth-pill">
-                <span>{{ google_user.email }}</span>
-                <a href="{{ url_for('logout_google') }}">Salir</a>
-            </div>
-        {% endif %}
+        <div class="auth-pill">
+            <span>Acceso autorizado</span>
+            <a href="{{ url_for('logout_report') }}">Salir</a>
+        </div>
     </header>
 
     <main class="container">
