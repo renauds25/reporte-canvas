@@ -13,6 +13,25 @@ const normalize = (text) =>
         .trim();
 
 const pageKey = (modalidad, curso) => `${modalidad}::${curso}`;
+function formatFecha(fecha) {
+    if (!fecha) return "-";
+
+    const texto = String(fecha).trim();
+
+    if (texto.includes("/")) {
+        return texto;
+    }
+
+    if (texto.includes("-")) {
+        const partes = texto.split("-");
+        if (partes.length === 3) {
+            const [anio, mes, dia] = partes;
+            return `${dia}/${mes}/${anio}`;
+        }
+    }
+
+    return texto;
+}
 
 async function loadReport() {
     const response = await fetch("/api/reporte", { cache: "no-store" });
@@ -25,7 +44,7 @@ function renderReport() {
     $("#totalRegistros").textContent = reporte.total_registros;
     $("#personasCompletas").textContent = reporte.personas_completas;
     $("#personasPendientes").textContent = reporte.personas_pendientes_con_avance ?? reporte.personas_pendientes;
-    $("#ultimaActualizacion").textContent = `Última actualización: ${reporte.ultima_actualizacion}`;
+    $("#ultimaActualizacion").textContent = `Última actualización: ${formatFecha(reporte.ultima_actualizacion)}`;
 
     renderModalidadResumen();
     renderCursoResumen();
@@ -133,7 +152,7 @@ function renderModalidadContent() {
                                                         (persona) => `
                                                             <tr>
                                                                 <td>${persona.nombre || "Sin nombre"}</td>
-                                                                <td>${persona.fecha_actualizacion}</td>
+                                                                <td>${formatFecha(persona.fecha_actualizacion)}</td>
                                                             </tr>
                                                         `
                                                     )
@@ -215,7 +234,7 @@ function renderSearchResults() {
                                             <tr>
                                                 <td>${curso.curso}</td>
                                                 <td>${curso.modalidad}</td>
-                                                <td>${curso.fecha_actualizacion}</td>
+                                                <td>${formatFecha(curso.fecha_actualizacion)}</td>
                                             </tr>
                                         `
                                     )
