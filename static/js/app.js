@@ -2,6 +2,8 @@ let reporte = null;
 let modalidadActiva = "Presencial";
 const registrosPorPagina = 10;
 const paginasCurso = {};
+const TOTAL_PARTICIPANTES_FALLBACK = 276;
+let modoAvanceCurso = "numero";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -33,6 +35,41 @@ function formatFecha(fecha) {
     return texto;
 }
 
+function getTotalParticipantesEsperados() {
+    return Number(reporte?.total_usuarios_esperados) || Number(reporte?.total_personas) || TOTAL_PARTICIPANTES_FALLBACK;
+}
+
+function formatNumber(value) {
+    return new Intl.NumberFormat("es-MX").format(Number(value) || 0);
+}
+
+function formatAvanceCurso(cantidad) {
+    const totalEsperado = getTotalParticipantesEsperados();
+
+    if (modoAvanceCurso === "porcentaje") {
+        const porcentaje = totalEsperado > 0 ? (Number(cantidad || 0) / totalEsperado) * 100 : 0;
+        return `${porcentaje.toFixed(1)}%`;
+    }
+
+    return formatNumber(cantidad);
+}
+
+function detalleAvanceCurso(cantidad) {
+    const totalEsperado = getTotalParticipantesEsperados();
+    return `${formatNumber(cantidad)} de ${formatNumber(totalEsperado)}`;
+}
+
+function updateToggleAvanceCursoText() {
+    const button = $("#toggleAvanceCurso");
+    if (!button) return;
+
+    button.textContent = modoAvanceCurso === "numero" ? "Ver %" : "Ver #";
+    button.setAttribute(
+        "aria-label",
+        modoAvanceCurso === "numero" ? "Mostrar avance por curso en porcentaje" : "Mostrar avance por curso en número"
+    );
+}
+
 async function loadReport() {
     const response = await fetch("/api/reporte", { cache: "no-store" });
     reporte = await response.json();
@@ -48,6 +85,7 @@ function renderReport() {
 
     renderModalidadResumen();
     renderCursoResumen();
+    updateToggleAvanceCursoText();
     renderTabs();
     renderModalidadContent();
     renderSearchResults();
@@ -73,10 +111,14 @@ function renderCursoResumen() {
     container.innerHTML = reporte.cursos_oficiales
         .map((curso) => {
             const total = reporte.conteo_por_curso[curso] || 0;
+            const detalle = detalleAvanceCurso(total);
             return `
-                <div class="summary-row">
+                <div class="summary-row summary-row-metric">
                     <span>${curso}</span>
-                    <strong>${total}</strong>
+                    <div class="metric-column" title="${detalle}">
+                        <strong class="metric-value metric-flip">${formatAvanceCurso(total)}</strong>
+                        ${modoAvanceCurso === "porcentaje" ? `<small>${detalle}</small>` : ""}
+                    </div>
                 </div>
             `;
         })
@@ -252,4 +294,13 @@ document.addEventListener("DOMContentLoaded", () => {
     loadReport();
     $("#searchInput").addEventListener("input", renderSearchResults);
     $("#refreshBtn").addEventListener("click", loadReport);
+
+    const toggleAvanceCurso = $("#toggleAvanceCurso");
+    if (toggleAvanceCurso) {
+        toggleAvanceCurso.addEventListener("click", () => {
+            modoAvanceCurso = modoAvanceCurso === "numero" ? "porcentaje" : "numero";
+            updateToggleAvanceCursoText();
+            renderCursoResumen();
+        });
+    }
 });

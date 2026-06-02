@@ -11,6 +11,8 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
+from authlib.integrations.flask_client import OAuth
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -18,6 +20,9 @@ CAPACITACIONES_PATH = DATA_DIR / "capacitaciones.csv"
 USUARIOS_PATH = DATA_DIR / "usuarios.csv"
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "hgjt8329")
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_ALLOWED_DOMAIN = os.environ.get("GOOGLE_ALLOWED_DOMAIN", "iest.edu.mx").lower().strip().lstrip("@")
 ALLOWED_EXTENSIONS = {"csv"}
 
 CURSOS_OFICIALES = [
@@ -33,6 +38,17 @@ MODALIDADES = ["Presencial", "En línea", "A distancia"]
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+oauth = OAuth(app)
+if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+    oauth.register(
+        name="google",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
 
 
 def allowed_file(filename: str) -> bool:
@@ -47,6 +63,33 @@ def login_required(view):
         return view(*args, **kwargs)
 
     return wrapped_view
+
+
+def google_login_enabled() -> bool:
+    return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+
+
+def user_is_authenticated() -> bool:
+    return not google_login_enabled() or bool(session.get("google_user"))
+
+
+def google_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if user_is_authenticated():
+            return view(*args, **kwargs)
+
+        session["next_url"] = request.full_path if request.query_string else request.path
+        return redirect(url_for("login"))
+
+    return wrapped_view
+
+
+def template_context() -> dict[str, Any]:
+    return {
+        "google_login_enabled": google_login_enabled(),
+        "google_user": session.get("google_user"),
+    }
 
 
 def clean(value: Any) -> str:
@@ -173,7 +216,8 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
         modalidad: {curso: [] for curso in CURSOS_OFICIALES} for modalidad in MODALIDADES
     }
     conteo_por_modalidad = {modalidad: 0 for modalidad in MODALIDADES}
-    conteo_por_curso = {curso: 0 for curso in CURSOS_OFICIALES}
+    conteo_por_curso_unico: dict[str, set[str]] = {curso: set() for curso in CURSOS_OFICIALES}
+    registros_unicos_total: set[tuple[str, str]] = set()
     registros_sin_coincidencia: list[dict[str, str]] = []
 
     for row in rows:
@@ -224,7 +268,15 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
             por_modalidad[modalidad][curso].append(resolved)
 
         conteo_por_modalidad[modalidad] = conteo_por_modalidad.get(modalidad, 0) + 1
-        conteo_por_curso[curso] = conteo_por_curso.get(curso, 0) + 1
+
+        curso_key = norm(curso)
+        if curso_key:
+            registros_unicos_total.add((persona_key, curso_key))
+            if curso not in conteo_por_curso_unico:
+                conteo_por_curso_unico[curso] = set()
+            conteo_por_curso_unico[curso].add(persona_key)
+
+    conteo_por_curso = {curso: len(personas_ids) for curso, personas_ids in conteo_por_curso_unico.items()}
 
     personas_lista = []
     for persona in personas.values():
@@ -271,7 +323,8 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
         "total_personas": total_personas_reporte,
         "personas_con_avance": personas_con_avance,
         "usuarios_sin_iniciar": len(usuarios_sin_iniciar),
-        "total_registros": len(rows),
+        "total_registros": len(registros_unicos_total),
+        "total_registros_filas": len(rows),
         "personas_completas": personas_completas,
         "personas_pendientes": personas_pendientes,
         "personas_pendientes_con_avance": personas_pendientes_con_avance,
@@ -287,12 +340,76 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
     }
 
 
+@app.get("/login")
+def login():
+    if not google_login_enabled():
+        return redirect(url_for("index"))
+
+    return render_template("login.html", error=None, allowed_domain=GOOGLE_ALLOWED_DOMAIN)
+
+
+@app.get("/login/google")
+def login_google():
+    if not google_login_enabled():
+        return redirect(url_for("index"))
+
+    redirect_uri = url_for("auth_callback", _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.get("/auth/callback")
+def auth_callback():
+    if not google_login_enabled():
+        return redirect(url_for("index"))
+
+    try:
+        token = oauth.google.authorize_access_token()
+        userinfo = token.get("userinfo")
+        if userinfo is None:
+            userinfo = oauth.google.parse_id_token(token)
+    except Exception:
+        session.clear()
+        return render_template(
+            "login.html",
+            error="No se pudo iniciar sesión con Google. Intenta nuevamente.",
+            allowed_domain=GOOGLE_ALLOWED_DOMAIN,
+        )
+
+    email = clean(userinfo.get("email", "")).lower()
+    domain = email.split("@")[-1] if "@" in email else ""
+
+    if domain != GOOGLE_ALLOWED_DOMAIN:
+        session.clear()
+        return render_template(
+            "login.html",
+            error=f"Solo se permite el acceso con cuentas @{GOOGLE_ALLOWED_DOMAIN}.",
+            allowed_domain=GOOGLE_ALLOWED_DOMAIN,
+        )
+
+    session["google_user"] = {
+        "email": email,
+        "name": clean(userinfo.get("name", "")),
+        "picture": clean(userinfo.get("picture", "")),
+    }
+
+    next_url = session.pop("next_url", url_for("index"))
+    return redirect(next_url or url_for("index"))
+
+
+@app.route("/logout", methods=["GET", "POST"])
+def logout_google():
+    session.clear()
+    return redirect(url_for("login") if google_login_enabled() else url_for("index"))
+
+
 @app.get("/")
+@google_required
 def index():
-    return render_template("index.html")
+    return render_template("index.html", **template_context())
 
 
 @app.get("/api/reporte")
+@google_required
 def api_reporte():
     rows = read_capacitaciones()
     users = read_users()
@@ -300,6 +417,7 @@ def api_reporte():
 
 
 @app.route("/admin", methods=["GET", "POST"])
+@google_required
 def admin():
     error = None
     if request.method == "POST":
@@ -316,6 +434,7 @@ def admin():
 
 
 @app.get("/admin/panel")
+@google_required
 @login_required
 def admin_panel():
     rows = read_capacitaciones()
@@ -362,6 +481,7 @@ def save_uploaded_csv(field_name: str, destination: Path, required_headers: set[
 
 
 @app.post("/admin/upload/capacitaciones")
+@google_required
 @login_required
 def upload_capacitaciones():
     required = {"id", "nombre", "curso", "modalidad", "fecha_actualizacion"}
@@ -374,6 +494,7 @@ def upload_capacitaciones():
 
 
 @app.post("/admin/upload/usuarios")
+@google_required
 @login_required
 def upload_usuarios():
     required = {"id", "nombre", "correo"}
@@ -405,6 +526,7 @@ def make_csv_response(filename: str, rows: list[dict[str, Any]], headers: list[s
 
 
 @app.get("/admin/download/sin-coincidencia")
+@google_required
 @login_required
 def download_sin_coincidencia():
     reporte = build_report(read_capacitaciones(), read_users())
@@ -413,6 +535,7 @@ def download_sin_coincidencia():
 
 
 @app.get("/admin/download/sin-iniciar")
+@google_required
 @login_required
 def download_sin_iniciar():
     reporte = build_report(read_capacitaciones(), read_users())

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Reporte integral de capacitaciones Canvas LMS</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
@@ -13,6 +14,12 @@
             <h1>Reporte integral de capacitaciones</h1>
             <p class="subtitle">Resumen general, avance por modalidad y cursos completados.</p>
         </div>
+        {% if google_login_enabled and google_user %}
+            <div class="auth-pill">
+                <span>{{ google_user.email }}</span>
+                <a href="{{ url_for('logout_google') }}">Salir</a>
+            </div>
+        {% endif %}
     </header>
 
     <main class="container">
@@ -51,7 +58,13 @@
                 <div id="modalidadResumen" class="summary-list"></div>
             </div>
             <div class="panel">
-                <h2>Avance por curso</h2>
+                <div class="panel-title-row">
+                    <div>
+                        <h2>Avance por curso</h2>
+                        <p class="muted small-note">Cursos únicos por participante.</p>
+                    </div>
+                    <button id="toggleAvanceCurso" class="btn small-btn" type="button">Ver %</button>
+                </div>
                 <div id="cursoResumen" class="summary-list"></div>
             </div>
         </section>
