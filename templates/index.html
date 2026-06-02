@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reporte Integral de Capacitaciones Canvas LMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="hero">
+        <div>
+            <p class="eyebrow">Canvas LMS</p>
+            <h1>Reporte Integral de Capacitaciones</h1>
+            <p class="subtitle">Resumen general, avance por modalidad y cursos completados.</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="section">
+            <div class="section-title">
+                <div>
+                    <h2>Resumen general</h2>
+                    <p id="ultimaActualizacion">Cargando datos...</p>
+                </div>
+                <button id="refreshBtn" class="btn secondary">Actualizar</button>
+            </div>
+
+            <div class="cards">
+                <article class="card">
+                    <span>Total de personas</span>
+                    <strong id="totalPersonas">0</strong>
+                </article>
+                <article class="card">
+                    <span>Cursos registrados</span>
+                    <strong id="totalRegistros">0</strong>
+                </article>
+                <article class="card success">
+                    <span>Con 6 cursos completos</span>
+                    <strong id="personasCompletas">0</strong>
+                </article>
+                <article class="card warning">
+                    <span>Pendientes</span>
+                    <strong id="personasPendientes">0</strong>
+                </article>
+            </div>
+        </section>
+
+        <section class="section grid-2">
+            <div class="panel">
+                <h2>Avance por modalidad</h2>
+                <div id="modalidadResumen" class="summary-list"></div>
+            </div>
+            <div class="panel">
+                <h2>Avance por curso</h2>
+                <div id="cursoResumen" class="summary-list"></div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-title">
+                <div>
+                    <h2>Buscar participante</h2>
+                </div>
+            </div>
+            <input id="searchInput" class="search" type="search" placeholder="Buscar participante">
+            <div id="searchResults" class="search-results"></div>
+        </section>
+
+        <section class="section">
+            <div class="section-title">
+                <div>
+                    <h2>Listas por modalidad</h2>
+                    <p>Se muestran 15 registros por curso. Los más recientes aparecen primero.</p>
+                </div>
+            </div>
+            <div id="modalidadTabs" class="tabs"></div>
+            <div id="modalidadContent"></div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

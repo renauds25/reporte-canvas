@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin | Reporte Canvas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="hero compact">
+        <div>
+            <p class="eyebrow">Panel admin</p>
+            <h1>Actualizar reporte Canvas LMS</h1>
+            <p class="subtitle">Sube la base maestra de usuarios y el CSV diario de capacitaciones.</p>
+        </div>
+        <a class="admin-link" href="/">Ver reporte</a>
+    </header>
+
+    <main class="container narrow">
+        {% if error %}
+            <div class="alert">{{ error }}</div>
+        {% endif %}
+
+        {% if not logged_in %}
+            <section class="section panel">
+                <h2>Acceso</h2>
+                <form method="post" class="form">
+                    <label for="password">Contraseña</label>
+                    <input id="password" name="password" type="password" required autofocus>
+                    <button class="btn" type="submit">Entrar</button>
+                </form>
+                <p class="muted">Contraseña inicial: <code>canvas-admin</code></p>
+            </section>
+        {% else %}
+            <section class="section panel">
+                <h2>1. Subir base maestra de usuarios</h2>
+                <p>Este archivo ayuda a completar nombres, correos e IDs cuando el CSV de capacitaciones venga incompleto.</p>
+                <pre class="code">id,nombre,correo</pre>
+
+                <form method="post" action="/admin/upload/usuarios" enctype="multipart/form-data" class="form">
+                    <label for="usuarios">Archivo CSV de usuarios</label>
+                    <input id="usuarios" name="archivo" type="file" accept=".csv" required>
+                    <button class="btn" type="submit">Actualizar usuarios</button>
+                </form>
+            </section>
+
+            <section class="section panel">
+                <h2>2. Subir CSV de capacitaciones</h2>
+                <p>Puede traer nombre incompleto o correo vacío, siempre que tenga ID o algún dato que coincida con la base maestra.</p>
+                <pre class="code">id,nombre,correo,curso,modalidad,fecha_actualizacion</pre>
+                <p class="muted">La columna <code>correo</code> se recomienda, pero el sistema también acepta el formato anterior sin correo.</p>
+
+                <form method="post" action="/admin/upload/capacitaciones" enctype="multipart/form-data" class="form">
+                    <label for="capacitaciones">Archivo CSV de capacitaciones</label>
+                    <input id="capacitaciones" name="archivo" type="file" accept=".csv" required>
+                    <button class="btn" type="submit">Actualizar capacitaciones</button>
+                </form>
+            </section>
+
+            <section class="section panel">
+                <h2>Estado actual</h2>
+                <div class="cards mini">
+                    <article class="card">
+                        <span>Usuarios esperados</span>
+                        <strong>{{ reporte.total_personas }}</strong>
+                    </article>
+                    <article class="card">
+                        <span>Con avance</span>
+                        <strong>{{ reporte.personas_con_avance }}</strong>
+                    </article>
+                    <article class="card">
+                        <span>Registros</span>
+                        <strong>{{ reporte.total_registros }}</strong>
+                    </article>
+                    <article class="card success">
+                        <span>Completos</span>
+                        <strong>{{ reporte.personas_completas }}</strong>
+                    </article>
+                    <article class="card warning">
+                        <span>Pendientes</span>
+                        <strong>{{ reporte.personas_pendientes }}</strong>
+                    </article>
+                    <article class="card warning">
+                        <span>Sin iniciar</span>
+                        <strong>{{ reporte.usuarios_sin_iniciar }}</strong>
+                    </article>
+                </div>
+                <p class="muted">Registros sin coincidencia en base maestra: {{ reporte.total_registros_sin_coincidencia }}</p>
+            </section>
+
+            <section class="section panel">
+                <h2>Control de calidad de datos</h2>
+                {% if reporte.usa_base_maestra %}
+                    <p class="warning-text">{{ reporte.total_registros_sin_coincidencia }} registro(s) de capacitación no coinciden con la base maestra.</p>
+                    <p class="warning-text">{{ reporte.usuarios_sin_iniciar }} usuario(s) de la base maestra todavía no tienen cursos registrados.</p>
+                    <div class="actions">
+                        <a class="btn secondary" href="/admin/download/sin-coincidencia">Descargar no coinciden</a>
+                        <a class="btn secondary" href="/admin/download/sin-iniciar">Descargar sin iniciar</a>
+                    </div>
+                {% else %}
+                    <p class="muted">Sube la base maestra de usuarios para activar la comparación de datos.</p>
+                {% endif %}
+            </section>
+
+            <form method="post" action="/admin/logout">
+                <button class="btn secondary" type="submit">Cerrar sesión</button>
+            </form>
+        {% endif %}
+    </main>
+</body>
+</html>
