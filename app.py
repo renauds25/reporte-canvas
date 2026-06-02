@@ -9,17 +9,28 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(BASE_DIR / ".env")
+
 DATA_DIR = BASE_DIR / "data"
 CAPACITACIONES_PATH = DATA_DIR / "capacitaciones.csv"
 USUARIOS_PATH = DATA_DIR / "usuarios.csv"
 
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "hgjt8329")
-REPORT_PASSWORD = os.environ.get("REPORT_PASSWORD", "canvas-2026")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
+
+if not ADMIN_PASSWORD:
+    raise RuntimeError("Falta definir ADMIN_PASSWORD en el archivo .env")
+
+if not REPORT_PASSWORD:
+    raise RuntimeError("Falta definir REPORT_PASSWORD en el archivo .env")
+
 ALLOWED_EXTENSIONS = {"csv"}
 
 CURSOS_OFICIALES = [
@@ -31,7 +42,13 @@ CURSOS_OFICIALES = [
     "CANVAS 6. EXÁMENES Y SPEEDGRADER.",
 ]
 
-MODALIDADES = ["Presencial", "En línea", "A distancia"]
+MODALIDADES_OFICIALES = [
+    "Presencial",
+    "En línea",
+    "A distancia",
+]
+
+MODALIDADES = MODALIDADES_OFICIALES
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
