@@ -232,17 +232,38 @@ function ordenarFilas(filas) {
             if (a.fecha_orden !== b.fecha_orden) return b.fecha_orden - a.fecha_orden;
             return a.nombre.localeCompare(b.nombre, "es");
         },
+
+        id: (a, b) => {
+            const idA = Number(String(a.id || "").replace(/\D/g, ""));
+            const idB = Number(String(b.id || "").replace(/\D/g, ""));
+
+            if (idA && idB) return idA - idB;
+            return String(a.id || "").localeCompare(String(b.id || ""), "es", { numeric: true });
+        },
+
+        id_desc: (a, b) => {
+            const idA = Number(String(a.id || "").replace(/\D/g, ""));
+            const idB = Number(String(b.id || "").replace(/\D/g, ""));
+
+            if (idA && idB) return idB - idA;
+            return String(b.id || "").localeCompare(String(a.id || ""), "es", { numeric: true });
+        },
+
         az: (a, b) => a.nombre.localeCompare(b.nombre, "es"),
+
         za: (a, b) => b.nombre.localeCompare(a.nombre, "es"),
+
         pendientes: (a, b) => {
             if (a.completado !== b.completado) return a.completado ? 1 : -1;
             return a.nombre.localeCompare(b.nombre, "es");
         },
+
         completados: (a, b) => {
             if (a.completado !== b.completado) return a.completado ? -1 : 1;
             if (a.fecha_orden !== b.fecha_orden) return b.fecha_orden - a.fecha_orden;
             return a.nombre.localeCompare(b.nombre, "es");
         },
+
         modalidad: (a, b) => {
             const modalidadA = a.completado ? a.modalidad : "zz Pendiente";
             const modalidadB = b.completado ? b.modalidad : "zz Pendiente";
