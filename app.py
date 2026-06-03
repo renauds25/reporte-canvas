@@ -4,7 +4,8 @@ import csv
 import os
 import unicodedata
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from functools import wraps
 from pathlib import Path
 from typing import Any
@@ -203,8 +204,15 @@ def resolve_person(row: dict[str, str], by_id: dict[str, dict[str, str]], by_ema
 
 def get_last_update_label() -> str:
     if CAPACITACIONES_PATH.exists():
-        modified = datetime.fromtimestamp(CAPACITACIONES_PATH.stat().st_mtime)
-        return modified.strftime("%d/%m/%Y %H:%M")
+        mexico_tz = ZoneInfo("America/Mexico_City")
+        modified_utc = datetime.fromtimestamp(
+            CAPACITACIONES_PATH.stat().st_mtime,
+            tz=timezone.utc
+        )
+        modified_mexico = modified_utc.astimezone(mexico_tz)
+
+        return modified_mexico.strftime("%d/%m/%Y %H:%M")
+
     return "Sin datos"
 
 def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dict[str, Any]:
