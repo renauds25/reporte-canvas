@@ -2,7 +2,7 @@ let reporte = null;
 const TODOS_LOS_CURSOS = "__TODOS__";
 let cursoActivo = TODOS_LOS_CURSOS;
 let ordenLista = "recientes";
-const registrosPorPagina = 10;
+const registrosPorPagina = 20;
 const paginasCurso = {};
 const TOTAL_PARTICIPANTES_FALLBACK = 276;
 
