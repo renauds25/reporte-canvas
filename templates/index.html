@@ -8,12 +8,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <header class="hero">
-        <div>
-            <p class="eyebrow">Canvas LMS</p>
-            <h1>Reporte integral de capacitaciones</h1>
-            <p class="subtitle">Resumen general, avance por modalidad y cursos completados.</p>
-        </div>
+    <header class="hero banner-hero">
+        <img class="hero-banner" src="{{ url_for('static', filename='img/banner-reporte-capacitacion.svg') }}" alt="Reporte integral de capacitaciones Canvas LMS">
         <div class="auth-pill">
             <span>Acceso autorizado</span>
             <a href="{{ url_for('logout_report') }}">Salir</a>
@@ -30,40 +26,56 @@
                 <button id="refreshBtn" class="btn secondary">Actualizar</button>
             </div>
 
-            <div class="cards">
-                <article class="card">
-                    <span>Total de personas</span>
-                    <strong id="totalPersonas">0</strong>
-                </article>
-                <article class="card">
-                    <span>Cursos registrados</span>
-                    <strong id="totalRegistros">0</strong>
-                </article>
-                <article class="card success">
-                    <span>Con 6 cursos completos</span>
-                    <strong id="personasCompletas">0</strong>
-                </article>
-                <article class="card warning">
-                    <span>Pendientes</span>
-                    <strong id="personasPendientes">0</strong>
+            <div class="summary-overview">
+                <div class="summary-cards-stack">
+                    <article class="card">
+                        <span>Maestro-curso</span>
+                        <strong id="totalRegistros">0</strong>
+                    </article>
+                    <article class="card success">
+                        <span>Maestros que han terminado curso 1 y 2</span>
+                        <strong id="personasCursosUnoDos">0</strong>
+                    </article>
+                </div>
+                <article class="panel pie-panel">
+                    <div class="panel-title-row pie-title-row">
+                        <div>
+                            <h3>Avance curso 1 y 2</h3>
+                            <p class="muted small-note">Gráfica de participantes que han completado los cursos 1 y 2.</p>
+                        </div>
+                    </div>
+                    <div class="pie-layout">
+                        <div id="pieCursosUnoDos" class="pie-chart" aria-label="Gráfica de pastel de avance del curso 1 y 2"></div>
+                        <div class="pie-legend">
+                            <div class="legend-item success">
+                                <span class="legend-dot"></span>
+                                <div>
+                                    <strong id="pieCompletados">0</strong>
+                                    <small>Completaron curso 1 y 2</small>
+                                </div>
+                            </div>
+                            <div class="legend-item pending">
+                                <span class="legend-dot"></span>
+                                <div>
+                                    <strong id="piePendientes">0</strong>
+                                    <small>Pendientes de completar ambos cursos</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </article>
             </div>
         </section>
 
-        <section class="section grid-2">
-            <div class="panel">
-                <h2>Avance por modalidad</h2>
-                <div id="modalidadResumen" class="summary-list"></div>
-            </div>
-            <div class="panel">
+        <section class="section">
+            <div class="panel course-progress-panel">
                 <div class="panel-title-row">
                     <div>
                         <h2>Avance por curso</h2>
-                        <p class="muted small-note">Cursos únicos por participante.</p>
+                        <p class="muted small-note">Porcentaje de participantes que han completado cada curso.</p>
                     </div>
-                    <button id="toggleAvanceCurso" class="btn small-btn" type="button">Ver %</button>
                 </div>
-                <div id="cursoResumen" class="summary-list"></div>
+                <div id="cursoResumen" class="summary-list progress-list"></div>
             </div>
         </section>
 

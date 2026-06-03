@@ -201,6 +201,11 @@ def resolve_person(row: dict[str, str], by_id: dict[str, dict[str, str]], by_ema
     fallback = row["id"] or email_key or name_key
     return fallback, None, "sin_coincidencia"
 
+def get_last_update_label() -> str:
+    if CAPACITACIONES_PATH.exists():
+        modified = datetime.fromtimestamp(CAPACITACIONES_PATH.stat().st_mtime)
+        return modified.strftime("%d/%m/%Y %H:%M")
+    return "Sin datos"
 
 def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dict[str, Any]:
     by_id, by_email, by_name = build_user_indexes(users)
@@ -302,6 +307,12 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
     total_personas_reporte = total_usuarios_esperados if users else len(personas_lista)
     personas_con_avance = len(personas_lista)
     personas_completas = sum(1 for persona in personas_lista if persona["completo"])
+    cursos_1_y_2 = {norm(curso) for curso in CURSOS_OFICIALES[:2]}
+    personas_con_cursos_1_y_2 = sum(
+        1
+        for persona in personas_lista
+        if cursos_1_y_2.issubset({norm(curso["curso"]) for curso in persona["cursos"]})
+    )
 
     personas_pendientes_con_avance = sum(1 for persona in personas_lista if not persona["completo"])
 
@@ -320,6 +331,7 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
         "total_registros": len(registros_unicos_total),
         "total_registros_filas": len(rows),
         "personas_completas": personas_completas,
+        "personas_con_cursos_1_y_2": personas_con_cursos_1_y_2,
         "personas_pendientes": personas_pendientes,
         "personas_pendientes_con_avance": personas_pendientes_con_avance,
         "conteo_por_modalidad": conteo_por_modalidad,
@@ -329,8 +341,7 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
         "usuarios_sin_iniciar_lista": usuarios_sin_iniciar,
         "registros_sin_coincidencia": registros_sin_coincidencia,
         "total_registros_sin_coincidencia": len(registros_sin_coincidencia),
-        "ultima_actualizacion": rows[0]["fecha_actualizacion"] if rows else "Sin datos",
-        "usa_base_maestra": bool(users),
+        "ultima_actualizacion": get_last_update_label(),        "usa_base_maestra": bool(users),
     }
 
 

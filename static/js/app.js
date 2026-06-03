@@ -3,7 +3,6 @@ let modalidadActiva = "Presencial";
 const registrosPorPagina = 10;
 const paginasCurso = {};
 const TOTAL_PARTICIPANTES_FALLBACK = 276;
-let modoAvanceCurso = "numero";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -45,13 +44,8 @@ function formatNumber(value) {
 
 function formatAvanceCurso(cantidad) {
     const totalEsperado = getTotalParticipantesEsperados();
-
-    if (modoAvanceCurso === "porcentaje") {
-        const porcentaje = totalEsperado > 0 ? (Number(cantidad || 0) / totalEsperado) * 100 : 0;
-        return `${porcentaje.toFixed(1)}%`;
-    }
-
-    return formatNumber(cantidad);
+    const porcentaje = totalEsperado > 0 ? (Number(cantidad || 0) / totalEsperado) * 100 : 0;
+    return `${porcentaje.toFixed(1)}%`;
 }
 
 function detalleAvanceCurso(cantidad) {
@@ -59,16 +53,6 @@ function detalleAvanceCurso(cantidad) {
     return `${formatNumber(cantidad)} de ${formatNumber(totalEsperado)}`;
 }
 
-function updateToggleAvanceCursoText() {
-    const button = $("#toggleAvanceCurso");
-    if (!button) return;
-
-    button.textContent = modoAvanceCurso === "numero" ? "Ver %" : "Ver #";
-    button.setAttribute(
-        "aria-label",
-        modoAvanceCurso === "numero" ? "Mostrar avance por curso en porcentaje" : "Mostrar avance por curso en número"
-    );
-}
 
 async function loadReport() {
     const response = await fetch("/api/reporte", { cache: "no-store" });
@@ -77,18 +61,32 @@ async function loadReport() {
 }
 
 function renderReport() {
-    $("#totalPersonas").textContent = reporte.personas_con_avance || reporte.total_personas;
     $("#totalRegistros").textContent = reporte.total_registros;
-    $("#personasCompletas").textContent = reporte.personas_completas;
-    $("#personasPendientes").textContent = reporte.personas_pendientes_con_avance ?? reporte.personas_pendientes;
+    $("#personasCursosUnoDos").textContent = reporte.personas_con_cursos_1_y_2 || 0;
     $("#ultimaActualizacion").textContent = `Última actualización: ${formatFecha(reporte.ultima_actualizacion)}`;
 
-    renderModalidadResumen();
+    renderPieCursosUnoDos();
     renderCursoResumen();
-    updateToggleAvanceCursoText();
     renderTabs();
     renderModalidadContent();
     renderSearchResults();
+}
+
+function renderPieCursosUnoDos() {
+    const completados = Number(reporte.personas_con_cursos_1_y_2 || 0);
+    const totalEsperado = getTotalParticipantesEsperados();
+    const pendientes = Math.max(totalEsperado - completados, 0);
+    const porcentaje = totalEsperado > 0 ? (completados / totalEsperado) * 100 : 0;
+    const grados = Math.max(0, Math.min(porcentaje, 100)) * 3.6;
+
+    const pie = $("#pieCursosUnoDos");
+    if (pie) {
+        pie.style.setProperty("--pie-value", `${grados}deg`);
+        pie.dataset.percent = `${porcentaje.toFixed(1)}%`;
+    }
+
+    $("#pieCompletados").textContent = formatNumber(completados);
+    $("#piePendientes").textContent = formatNumber(pendientes);
 }
 
 function renderModalidadResumen() {
@@ -108,16 +106,26 @@ function renderModalidadResumen() {
 
 function renderCursoResumen() {
     const container = $("#cursoResumen");
+    const totalEsperado = getTotalParticipantesEsperados();
+
     container.innerHTML = reporte.cursos_oficiales
         .map((curso) => {
             const total = reporte.conteo_por_curso[curso] || 0;
+            const porcentaje = totalEsperado > 0 ? (Number(total || 0) / totalEsperado) * 100 : 0;
             const detalle = detalleAvanceCurso(total);
+            const porcentajeTexto = `${porcentaje.toFixed(1)}%`;
+            const progreso = Math.max(0, Math.min(porcentaje, 100));
             return `
-                <div class="summary-row summary-row-metric">
-                    <span>${curso}</span>
+                <div class="summary-row summary-row-metric progress-row">
+                    <div class="course-progress-info">
+                        <span>${curso}</span>
+                        <div class="progress-track" aria-label="${curso}: ${porcentajeTexto}">
+                            <div class="progress-fill" style="width: ${progreso}%"></div>
+                        </div>
+                    </div>
                     <div class="metric-column" title="${detalle}">
-                        <strong class="metric-value metric-flip">${formatAvanceCurso(total)}</strong>
-                        ${modoAvanceCurso === "porcentaje" ? `<small>${detalle}</small>` : ""}
+                        <strong class="metric-value">${porcentajeTexto}</strong>
+                        <small>${detalle}</small>
                     </div>
                 </div>
             `;
@@ -157,6 +165,30 @@ function setCoursePage(modalidad, curso, pagina) {
     renderModalidadContent();
 }
 
+function csvValue(value) {
+    return `"${String(value || "").replace(/"/g, '""')}"`;
+}
+
+function exportarTablaCurso(modalidad, curso) {
+    const cursos = reporte.por_modalidad[modalidad] || {};
+    const personas = cursos[curso] || [];
+    const headers = ["nombre", "fecha_actualizacion"];
+    const rows = personas.map((persona) => [persona.nombre || "Sin nombre", formatFecha(persona.fecha_actualizacion)]);
+    const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeCurso = normalize(curso).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "curso";
+    const safeModalidad = normalize(modalidad).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "modalidad";
+
+    link.href = url;
+    link.download = `${safeModalidad}-${safeCurso}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
 function renderModalidadContent() {
     const container = $("#modalidadContent");
     const cursos = reporte.por_modalidad[modalidadActiva] || {};
@@ -176,7 +208,10 @@ function renderModalidadContent() {
                         <article class="course-block compact-course">
                             <div class="course-header">
                                 <h3>${curso}</h3>
-                                <span>${personas.length} registro${personas.length === 1 ? "" : "s"}</span>
+                                <div class="course-actions">
+                                    <span>${personas.length} registro${personas.length === 1 ? "" : "s"}</span>
+                                    <button class="export-btn" type="button" data-curso="${curso}" data-modalidad="${modalidadActiva}" ${personas.length ? "" : "disabled"}>Exportar</button>
+                                </div>
                             </div>
                             ${
                                 personas.length
@@ -221,6 +256,12 @@ function renderModalidadContent() {
     container.querySelectorAll(".pager-btn").forEach((button) => {
         button.addEventListener("click", () => {
             setCoursePage(modalidadActiva, button.dataset.curso, Number(button.dataset.page));
+        });
+    });
+
+    container.querySelectorAll(".export-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+            exportarTablaCurso(button.dataset.modalidad, button.dataset.curso);
         });
     });
 }
@@ -295,12 +336,4 @@ document.addEventListener("DOMContentLoaded", () => {
     $("#searchInput").addEventListener("input", renderSearchResults);
     $("#refreshBtn").addEventListener("click", loadReport);
 
-    const toggleAvanceCurso = $("#toggleAvanceCurso");
-    if (toggleAvanceCurso) {
-        toggleAvanceCurso.addEventListener("click", () => {
-            modoAvanceCurso = modoAvanceCurso === "numero" ? "porcentaje" : "numero";
-            updateToggleAvanceCursoText();
-            renderCursoResumen();
-        });
-    }
 });
