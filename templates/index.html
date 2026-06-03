@@ -26,45 +26,33 @@
                 <button id="refreshBtn" class="btn secondary">Actualizar</button>
             </div>
 
-            <div class="summary-overview">
-                <div class="summary-cards-stack">
-                    <article class="card">
-                        <span>Maestro-curso</span>
-                        <strong id="totalRegistros">0</strong>
-                    </article>
-                    <article class="card success">
-                        <span>Maestros que han terminado curso 1 y 2</span>
-                        <strong id="personasCursosUnoDos">0</strong>
-                    </article>
+            <article class="panel pie-panel pie-panel-first">
+                <div class="panel-title-row pie-title-row">
+                    <div>
+                        <h3>Avance cursos CANVAS 1 y CANVAS 2</h3>
+                        <p class="muted small-note">Distribución de maestros que han completado ambos cursos frente a quienes aún tienen pendiente concluirlos.</p>
+                    </div>
                 </div>
-                <article class="panel pie-panel">
-                    <div class="panel-title-row pie-title-row">
-                        <div>
-                            <h3>Avance curso 1 y 2</h3>
-                            <p class="muted small-note">Gráfica de participantes que han completado los cursos 1 y 2.</p>
-                        </div>
-                    </div>
-                    <div class="pie-layout">
-                        <div id="pieCursosUnoDos" class="pie-chart" aria-label="Gráfica de pastel de avance del curso 1 y 2"></div>
-                        <div class="pie-legend">
-                            <div class="legend-item success">
-                                <span class="legend-dot"></span>
-                                <div>
-                                    <strong id="pieCompletados">0</strong>
-                                    <small>Completaron curso 1 y 2</small>
-                                </div>
+                <div class="pie-layout">
+                    <div id="pieCursosUnoDos" class="pie-chart" aria-label="Gráfica de pastel de avance de cursos CANVAS 1 y CANVAS 2"></div>
+                    <div class="pie-legend">
+                        <div class="legend-item success">
+                            <span class="legend-dot"></span>
+                            <div>
+                                <strong id="pieCompletados">0</strong>
+                                <small>Maestros que completaron ambos cursos</small>
                             </div>
-                            <div class="legend-item pending">
-                                <span class="legend-dot"></span>
-                                <div>
-                                    <strong id="piePendientes">0</strong>
-                                    <small>Pendientes de completar ambos cursos</small>
-                                </div>
+                        </div>
+                        <div class="legend-item pending">
+                            <span class="legend-dot"></span>
+                            <div>
+                                <strong id="piePendientes">0</strong>
+                                <small>Maestros pendientes por completarlos</small>
                             </div>
                         </div>
                     </div>
-                </article>
-            </div>
+                </div>
+            </article>
         </section>
 
         <section class="section">
@@ -93,11 +81,22 @@
         <section class="section">
             <div class="section-title">
                 <div>
-                    <h2>Listas de asistencia por modalidad</h2>
-                    <p>Se muestran 10 registros por curso. Los más recientes aparecen primero.</p>
+                    <h2>Listas de asistencia</h2>
+                    <p>Se muestran 10 registros por página. Puedes filtrar por curso y ordenar la lista.</p>
                 </div>
             </div>
-            <div id="modalidadTabs" class="tabs"></div>
+            <div id="modalidadTabs" class="tabs course-filter-tabs"></div>
+            <div class="list-toolbar">
+                <label for="sortSelect">Ordenar por</label>
+                <select id="sortSelect" class="sort-select">
+                    <option value="recientes">Más recientes primero</option>
+                    <option value="az">Alfabético A-Z</option>
+                    <option value="za">Alfabético Z-A</option>
+                    <option value="pendientes">Pendientes primero</option>
+                    <option value="completados">Completados primero</option>
+                    <option value="modalidad">Modalidad</option>
+                </select>
+            </div>
             <div id="modalidadContent"></div>
         </section>
     </main>

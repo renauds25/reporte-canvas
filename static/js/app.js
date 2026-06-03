@@ -1,6 +1,8 @@
 let reporte = null;
-let modalidadActiva = "Presencial";
-const registrosPorPagina = 10;
+const TODOS_LOS_CURSOS = "__TODOS__";
+let cursoActivo = TODOS_LOS_CURSOS;
+let ordenLista = "recientes";
+const registrosPorPagina =20;
 const paginasCurso = {};
 const TOTAL_PARTICIPANTES_FALLBACK = 276;
 
@@ -13,15 +15,15 @@ const normalize = (text) =>
         .replace(/[\u0300-\u036f]/g, "")
         .trim();
 
-const pageKey = (modalidad, curso) => `${modalidad}::${curso}`;
+const pageKey = (curso) => `${curso || TODOS_LOS_CURSOS}::${ordenLista}`;
+
 function formatFecha(fecha) {
     if (!fecha) return "-";
 
     const texto = String(fecha).trim();
 
-    if (texto.includes("/")) {
-        return texto;
-    }
+    if (texto.includes("/") && texto.includes(":")) return texto;
+    if (texto.includes("/") && !texto.includes("-")) return texto;
 
     if (texto.includes("-")) {
         const partes = texto.split("-");
@@ -34,6 +36,25 @@ function formatFecha(fecha) {
     return texto;
 }
 
+function parseFechaOrden(fecha) {
+    if (!fecha) return 0;
+
+    const texto = String(fecha).trim();
+    const fechaSinHora = texto.split(" ")[0];
+
+    if (fechaSinHora.includes("/")) {
+        const [dia, mes, anio] = fechaSinHora.split("/").map(Number);
+        return new Date(anio, mes - 1, dia).getTime();
+    }
+
+    if (fechaSinHora.includes("-")) {
+        const [anio, mes, dia] = fechaSinHora.split("-").map(Number);
+        return new Date(anio, mes - 1, dia).getTime();
+    }
+
+    return 0;
+}
+
 function getTotalParticipantesEsperados() {
     return Number(reporte?.total_usuarios_esperados) || Number(reporte?.total_personas) || TOTAL_PARTICIPANTES_FALLBACK;
 }
@@ -42,27 +63,19 @@ function formatNumber(value) {
     return new Intl.NumberFormat("es-MX").format(Number(value) || 0);
 }
 
-function formatAvanceCurso(cantidad) {
-    const totalEsperado = getTotalParticipantesEsperados();
-    const porcentaje = totalEsperado > 0 ? (Number(cantidad || 0) / totalEsperado) * 100 : 0;
-    return `${porcentaje.toFixed(1)}%`;
-}
-
 function detalleAvanceCurso(cantidad) {
     const totalEsperado = getTotalParticipantesEsperados();
     return `${formatNumber(cantidad)} de ${formatNumber(totalEsperado)}`;
 }
 
-
 async function loadReport() {
     const response = await fetch("/api/reporte", { cache: "no-store" });
     reporte = await response.json();
+    if (!cursoActivo) cursoActivo = TODOS_LOS_CURSOS;
     renderReport();
 }
 
 function renderReport() {
-    $("#totalRegistros").textContent = reporte.total_registros;
-    $("#personasCursosUnoDos").textContent = reporte.personas_con_cursos_1_y_2 || 0;
     $("#ultimaActualizacion").textContent = `Última actualización: ${formatFecha(reporte.ultima_actualizacion)}`;
 
     renderPieCursosUnoDos();
@@ -87,21 +100,6 @@ function renderPieCursosUnoDos() {
 
     $("#pieCompletados").textContent = formatNumber(completados);
     $("#piePendientes").textContent = formatNumber(pendientes);
-}
-
-function renderModalidadResumen() {
-    const container = $("#modalidadResumen");
-    container.innerHTML = reporte.modalidades
-        .map((modalidad) => {
-            const total = reporte.conteo_por_modalidad[modalidad] || 0;
-            return `
-                <div class="summary-row">
-                    <span>${modalidad}</span>
-                    <strong>${total}</strong>
-                </div>
-            `;
-        })
-        .join("");
 }
 
 function renderCursoResumen() {
@@ -133,35 +131,45 @@ function renderCursoResumen() {
         .join("");
 }
 
+function getCursoLabel(curso) {
+    if (curso === TODOS_LOS_CURSOS) return "Todos";
+
+    const index = (reporte.cursos_oficiales || []).indexOf(curso);
+    return index >= 0 ? `CANVAS ${index + 1}` : curso;
+}
+
 function renderTabs() {
     const container = $("#modalidadTabs");
-    container.innerHTML = reporte.modalidades
-        .map(
-            (modalidad) => `
-                <button class="tab ${modalidad === modalidadActiva ? "active" : ""}" data-modalidad="${modalidad}">
-                    ${modalidad}
+    const cursos = [TODOS_LOS_CURSOS, ...(reporte.cursos_oficiales || [])];
+
+    container.innerHTML = cursos
+        .map((curso) => {
+            return `
+                <button class="tab ${curso === cursoActivo ? "active" : ""}" data-curso="${curso}">
+                    ${getCursoLabel(curso)}
                 </button>
-            `
-        )
+            `;
+        })
         .join("");
 
     container.querySelectorAll(".tab").forEach((tab) => {
         tab.addEventListener("click", () => {
-            modalidadActiva = tab.dataset.modalidad;
+            cursoActivo = tab.dataset.curso;
+            paginasCurso[pageKey(cursoActivo)] = 1;
             renderTabs();
             renderModalidadContent();
         });
     });
 }
 
-function getCoursePage(modalidad, curso, totalPaginas) {
-    const key = pageKey(modalidad, curso);
+function getCoursePage(curso, totalPaginas) {
+    const key = pageKey(curso);
     const pagina = paginasCurso[key] || 1;
     return Math.min(Math.max(pagina, 1), Math.max(totalPaginas, 1));
 }
 
-function setCoursePage(modalidad, curso, pagina) {
-    paginasCurso[pageKey(modalidad, curso)] = pagina;
+function setCoursePage(curso, pagina) {
+    paginasCurso[pageKey(curso)] = pagina;
     renderModalidadContent();
 }
 
@@ -169,20 +177,142 @@ function csvValue(value) {
     return `"${String(value || "").replace(/"/g, '""')}"`;
 }
 
-function exportarTablaCurso(modalidad, curso) {
-    const cursos = reporte.por_modalidad[modalidad] || {};
-    const personas = cursos[curso] || [];
-    const headers = ["nombre", "fecha_actualizacion"];
-    const rows = personas.map((persona) => [persona.nombre || "Sin nombre", formatFecha(persona.fecha_actualizacion)]);
+function getPersonaKey(persona) {
+    return String(persona.id || persona.correo || normalize(persona.nombre) || "").trim();
+}
+
+function getPersonasPorKey() {
+    const map = new Map();
+    (reporte.personas || []).forEach((persona) => {
+        const key = getPersonaKey(persona);
+        if (key) map.set(key, persona);
+    });
+    return map;
+}
+
+function getMaestrosBase() {
+    const usuarios = reporte.usuarios_lista || [];
+    if (usuarios.length) {
+        return usuarios.map((usuario) => ({
+            id: usuario.id || "",
+            nombre: usuario.nombre || "Sin nombre",
+            correo: usuario.correo || "",
+        }));
+    }
+
+    return (reporte.personas || []).map((persona) => ({
+        id: persona.id || "",
+        nombre: persona.nombre || "Sin nombre",
+        correo: persona.correo || "",
+    }));
+}
+
+function getRegistroCursoMaestro(maestro, curso) {
+    const personasPorKey = getPersonasPorKey();
+    const persona = personasPorKey.get(getPersonaKey(maestro));
+
+    if (!persona) return null;
+
+    const cursoNormalizado = normalize(curso);
+    const registros = (persona.cursos || []).filter(
+        (registro) => normalize(registro.curso) === cursoNormalizado
+    );
+
+    if (!registros.length) return null;
+
+    return registros.sort(
+        (a, b) => parseFechaOrden(b.fecha_actualizacion) - parseFechaOrden(a.fecha_actualizacion)
+    )[0];
+}
+
+function ordenarFilas(filas) {
+    const ordenadores = {
+        recientes: (a, b) => {
+            if (a.completado !== b.completado) return a.completado ? -1 : 1;
+            if (a.fecha_orden !== b.fecha_orden) return b.fecha_orden - a.fecha_orden;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+        az: (a, b) => a.nombre.localeCompare(b.nombre, "es"),
+        za: (a, b) => b.nombre.localeCompare(a.nombre, "es"),
+        pendientes: (a, b) => {
+            if (a.completado !== b.completado) return a.completado ? 1 : -1;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+        completados: (a, b) => {
+            if (a.completado !== b.completado) return a.completado ? -1 : 1;
+            if (a.fecha_orden !== b.fecha_orden) return b.fecha_orden - a.fecha_orden;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+        modalidad: (a, b) => {
+            const modalidadA = a.completado ? a.modalidad : "zz Pendiente";
+            const modalidadB = b.completado ? b.modalidad : "zz Pendiente";
+            const comparacionModalidad = modalidadA.localeCompare(modalidadB, "es");
+            if (comparacionModalidad !== 0) return comparacionModalidad;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+    };
+
+    return [...filas].sort(ordenadores[ordenLista] || ordenadores.recientes);
+}
+
+function getFilasCurso(curso) {
+    return ordenarFilas(
+        getMaestrosBase().map((maestro) => {
+            const registro = getRegistroCursoMaestro(maestro, curso);
+            const completado = Boolean(registro);
+            const fecha = registro?.fecha_actualizacion || "";
+
+            return {
+                nombre: maestro.nombre || "Sin nombre",
+                actualizacion: completado ? formatFecha(fecha) : "Pendiente",
+                modalidad: completado ? registro.modalidad : "Pendiente",
+                completado,
+                fecha_orden: parseFechaOrden(fecha),
+            };
+        })
+    );
+}
+
+function getFilasTodos() {
+    return ordenarFilas(
+        (reporte.cursos_oficiales || []).flatMap((curso) =>
+            getMaestrosBase().map((maestro) => {
+                const registro = getRegistroCursoMaestro(maestro, curso);
+                const completado = Boolean(registro);
+                const fecha = registro?.fecha_actualizacion || "";
+
+                return {
+                    curso,
+                    nombre: maestro.nombre || "Sin nombre",
+                    actualizacion: completado ? formatFecha(fecha) : "Pendiente",
+                    modalidad: completado ? registro.modalidad : "Pendiente",
+                    completado,
+                    fecha_orden: parseFechaOrden(fecha),
+                };
+            })
+        )
+    );
+}
+
+function exportarTablaCurso(curso) {
+    const esTodos = curso === TODOS_LOS_CURSOS;
+    const filas = esTodos ? getFilasTodos() : getFilasCurso(curso);
+    const headers = esTodos ? ["curso", "nombre", "actualizacion", "modalidad"] : ["nombre", "actualizacion", "modalidad"];
+    const rows = filas.map((fila) =>
+        esTodos
+            ? [fila.curso, fila.nombre, fila.actualizacion, fila.modalidad]
+            : [fila.nombre, fila.actualizacion, fila.modalidad]
+    );
     const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    const safeCurso = normalize(curso).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "curso";
-    const safeModalidad = normalize(modalidad).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "modalidad";
+    const safeCurso = esTodos
+        ? "todos-los-cursos"
+        : normalize(curso).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "curso";
 
     link.href = url;
-    link.download = `${safeModalidad}-${safeCurso}.csv`;
+    link.download = `${safeCurso}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -191,78 +321,94 @@ function exportarTablaCurso(modalidad, curso) {
 
 function renderModalidadContent() {
     const container = $("#modalidadContent");
-    const cursos = reporte.por_modalidad[modalidadActiva] || {};
+    const curso = cursoActivo || TODOS_LOS_CURSOS;
+    const esTodos = curso === TODOS_LOS_CURSOS;
+    const filas = esTodos ? getFilasTodos() : getFilasCurso(curso);
+    const completados = filas.filter((fila) => fila.completado).length;
+    const totalPaginas = Math.ceil(filas.length / registrosPorPagina) || 1;
+    const paginaActual = getCoursePage(curso, totalPaginas);
+    const inicio = (paginaActual - 1) * registrosPorPagina;
+    const visibles = filas.slice(inicio, inicio + registrosPorPagina);
+    const fin = filas.length ? Math.min(inicio + registrosPorPagina, filas.length) : 0;
+    const titulo = esTodos ? "Todos los cursos" : curso;
+    const subtitulo = esTodos ? "Lista general de asistencia de todos los cursos." : "Lista de asistencia del curso seleccionado.";
 
     container.innerHTML = `
-        <div class="courses-grid">
-            ${reporte.cursos_oficiales
-                .map((curso) => {
-                    const personas = cursos[curso] || [];
-                    const totalPaginas = Math.ceil(personas.length / registrosPorPagina) || 1;
-                    const paginaActual = getCoursePage(modalidadActiva, curso, totalPaginas);
-                    const inicio = (paginaActual - 1) * registrosPorPagina;
-                    const visibles = personas.slice(inicio, inicio + registrosPorPagina);
-                    const fin = personas.length ? Math.min(inicio + registrosPorPagina, personas.length) : 0;
-
-                    return `
-                        <article class="course-block compact-course">
-                            <div class="course-header">
-                                <h3>${curso}</h3>
-                                <div class="course-actions">
-                                    <span>${personas.length} registro${personas.length === 1 ? "" : "s"}</span>
-                                    <button class="export-btn" type="button" data-curso="${curso}" data-modalidad="${modalidadActiva}" ${personas.length ? "" : "disabled"}>Exportar</button>
-                                </div>
-                            </div>
-                            ${
-                                personas.length
-                                    ? `<div class="table-wrap course-table">
-                                        <table>
-                                            <thead>
-                                                <tr>
-                                                    <th>Nombre</th>
-                                                    <th>Actualización</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                ${visibles
-                                                    .map(
-                                                        (persona) => `
-                                                            <tr>
-                                                                <td>${persona.nombre || "Sin nombre"}</td>
-                                                                <td>${formatFecha(persona.fecha_actualizacion)}</td>
-                                                            </tr>
-                                                        `
-                                                    )
-                                                    .join("")}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="pagination">
-                                        <span>${inicio + 1}-${fin} de ${personas.length}</span>
-                                        <div>
-                                            <button class="pager-btn" data-curso="${curso}" data-page="${paginaActual - 1}" ${paginaActual === 1 ? "disabled" : ""}>Anterior</button>
-                                            <button class="pager-btn" data-curso="${curso}" data-page="${paginaActual + 1}" ${paginaActual === totalPaginas ? "disabled" : ""}>Siguiente</button>
-                                        </div>
-                                    </div>`
-                                    : `<p class="empty">Sin registros.</p>`
-                            }
-                        </article>
-                    `;
-                })
-                .join("")}
-        </div>
+        <article class="course-block selected-course-block">
+            <div class="course-header">
+                <div>
+                    <h3>${titulo}</h3>
+                    <p class="muted small-note">${subtitulo}</p>
+                </div>
+                <div class="course-actions">
+                    <span>${completados} completado${completados === 1 ? "" : "s"}</span>
+                    <button class="export-btn" type="button" data-curso="${curso}" ${filas.length ? "" : "disabled"}>Exportar</button>
+                </div>
+            </div>
+            <div class="table-wrap course-table selected-course-table">
+                <table>
+                    <thead>
+                        <tr>
+                            ${esTodos ? "<th>Curso</th>" : ""}
+                            <th>Nombre</th>
+                            <th>Actualización</th>
+                            <th>Modalidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${visibles
+                            .map(
+                                (fila) => `
+                                    <tr>
+                                        ${esTodos ? `<td>${getCursoLabel(fila.curso)}</td>` : ""}
+                                        <td>${fila.nombre}</td>
+                                        <td>${fila.completado ? fila.actualizacion : `<span class="table-status pending">${fila.actualizacion}</span>`}</td>
+                                        <td>${fila.completado ? fila.modalidad : `<span class="table-status pending">${fila.modalidad}</span>`}</td>
+                                    </tr>
+                                `
+                            )
+                            .join("")}
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <span>${inicio + 1}-${fin} de ${filas.length}</span>
+                <div>
+                    <button class="pager-btn" data-page="${paginaActual - 1}" ${paginaActual === 1 ? "disabled" : ""}>Anterior</button>
+                    <button class="pager-btn" data-page="${paginaActual + 1}" ${paginaActual === totalPaginas ? "disabled" : ""}>Siguiente</button>
+                </div>
+            </div>
+        </article>
     `;
 
     container.querySelectorAll(".pager-btn").forEach((button) => {
         button.addEventListener("click", () => {
-            setCoursePage(modalidadActiva, button.dataset.curso, Number(button.dataset.page));
+            setCoursePage(curso, Number(button.dataset.page));
         });
     });
 
     container.querySelectorAll(".export-btn").forEach((button) => {
         button.addEventListener("click", () => {
-            exportarTablaCurso(button.dataset.modalidad, button.dataset.curso);
+            exportarTablaCurso(button.dataset.curso);
         });
+    });
+}
+
+function getPersonasBusqueda() {
+    const personasPorKey = getPersonasPorKey();
+    return getMaestrosBase().map((maestro) => {
+        const persona = personasPorKey.get(getPersonaKey(maestro));
+        if (persona) return persona;
+
+        return {
+            id: maestro.id || "",
+            nombre: maestro.nombre || "Sin nombre",
+            correo: maestro.correo || "",
+            cursos: [],
+            total_cursos: 0,
+            completo: false,
+            pendientes: 6,
+        };
     });
 }
 
@@ -275,7 +421,7 @@ function renderSearchResults() {
         return;
     }
 
-    const results = reporte.personas.filter((persona) => {
+    const results = getPersonasBusqueda().filter((persona) => {
         return (
             normalize(persona.nombre).includes(query) ||
             normalize(persona.id).includes(query) ||
@@ -297,7 +443,7 @@ function renderSearchResults() {
                             <h3>${persona.nombre || "Sin nombre"}</h3>
                         </div>
                         <span class="status ${persona.completo ? "done" : "pending"}">
-                            ${persona.completo ? "Completo" : `Pendiente: ${persona.pendientes}`}
+                            ${persona.completo ? "Completo" : `Número de cursos pendientes: ${persona.pendientes}`}
                         </span>
                     </div>
                     <p><strong>Cursos completados:</strong> ${persona.total_cursos} de 6</p>
@@ -311,7 +457,7 @@ function renderSearchResults() {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${persona.cursos
+                                ${(persona.cursos || [])
                                     .map(
                                         (curso) => `
                                             <tr>
@@ -321,7 +467,7 @@ function renderSearchResults() {
                                             </tr>
                                         `
                                     )
-                                    .join("")}
+                                    .join("") || `<tr><td colspan="3">Sin cursos registrados.</td></tr>`}
                             </tbody>
                         </table>
                     </div>
@@ -335,5 +481,12 @@ document.addEventListener("DOMContentLoaded", () => {
     loadReport();
     $("#searchInput").addEventListener("input", renderSearchResults);
     $("#refreshBtn").addEventListener("click", loadReport);
-
+    const sortSelect = $("#sortSelect");
+    if (sortSelect) {
+        sortSelect.addEventListener("change", () => {
+            ordenLista = sortSelect.value;
+            paginasCurso[pageKey(cursoActivo)] = 1;
+            renderModalidadContent();
+        });
+    }
 });

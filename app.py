@@ -111,6 +111,18 @@ def parse_date(value: str) -> datetime:
             continue
     return datetime.min
 
+def get_last_update_label() -> str:
+    if CAPACITACIONES_PATH.exists():
+        mexico_tz = ZoneInfo("America/Mexico_City")
+        modified_utc = datetime.fromtimestamp(
+            CAPACITACIONES_PATH.stat().st_mtime,
+            tz=timezone.utc,
+        )
+        modified_mexico = modified_utc.astimezone(mexico_tz)
+        return modified_mexico.strftime("%d/%m/%Y %H:%M")
+
+    return "Sin datos"
+
 
 def get_value(row: dict[str, str], *keys: str) -> str:
     normalized = {norm(key): value for key, value in row.items()}
@@ -202,18 +214,6 @@ def resolve_person(row: dict[str, str], by_id: dict[str, dict[str, str]], by_ema
     fallback = row["id"] or email_key or name_key
     return fallback, None, "sin_coincidencia"
 
-def get_last_update_label() -> str:
-    if CAPACITACIONES_PATH.exists():
-        mexico_tz = ZoneInfo("America/Mexico_City")
-        modified_utc = datetime.fromtimestamp(
-            CAPACITACIONES_PATH.stat().st_mtime,
-            tz=timezone.utc
-        )
-        modified_mexico = modified_utc.astimezone(mexico_tz)
-
-        return modified_mexico.strftime("%d/%m/%Y %H:%M")
-
-    return "Sin datos"
 
 def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dict[str, Any]:
     by_id, by_email, by_name = build_user_indexes(users)
@@ -346,10 +346,12 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
         "conteo_por_curso": conteo_por_curso,
         "por_modalidad": por_modalidad,
         "personas": personas_lista,
+        "usuarios_lista": sorted(users, key=lambda user: norm(user.get("nombre", ""))),
         "usuarios_sin_iniciar_lista": usuarios_sin_iniciar,
         "registros_sin_coincidencia": registros_sin_coincidencia,
         "total_registros_sin_coincidencia": len(registros_sin_coincidencia),
-        "ultima_actualizacion": get_last_update_label(),        "usa_base_maestra": bool(users),
+        "ultima_actualizacion": get_last_update_label(),
+        "usa_base_maestra": bool(users),
     }
 
 
