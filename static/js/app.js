@@ -2,7 +2,7 @@ let reporte = null;
 const TODOS_LOS_CURSOS = "__TODOS__";
 let cursoActivo = TODOS_LOS_CURSOS;
 let ordenLista = "recientes";
-const registrosPorPagina =20;
+const registrosPorPagina = 10;
 const paginasCurso = {};
 const TOTAL_PARTICIPANTES_FALLBACK = 276;
 
@@ -263,6 +263,7 @@ function getFilasCurso(curso) {
             const fecha = registro?.fecha_actualizacion || "";
 
             return {
+                id: maestro.id || "-",
                 nombre: maestro.nombre || "Sin nombre",
                 actualizacion: completado ? formatFecha(fecha) : "Pendiente",
                 modalidad: completado ? registro.modalidad : "Pendiente",
@@ -283,6 +284,7 @@ function getFilasTodos() {
 
                 return {
                     curso,
+                    id: maestro.id || "-",
                     nombre: maestro.nombre || "Sin nombre",
                     actualizacion: completado ? formatFecha(fecha) : "Pendiente",
                     modalidad: completado ? registro.modalidad : "Pendiente",
@@ -297,11 +299,11 @@ function getFilasTodos() {
 function exportarTablaCurso(curso) {
     const esTodos = curso === TODOS_LOS_CURSOS;
     const filas = esTodos ? getFilasTodos() : getFilasCurso(curso);
-    const headers = esTodos ? ["curso", "nombre", "actualizacion", "modalidad"] : ["nombre", "actualizacion", "modalidad"];
+    const headers = esTodos ? ["curso", "id", "nombre", "actualizacion", "modalidad"] : ["id", "nombre", "actualizacion", "modalidad"];
     const rows = filas.map((fila) =>
         esTodos
-            ? [fila.curso, fila.nombre, fila.actualizacion, fila.modalidad]
-            : [fila.nombre, fila.actualizacion, fila.modalidad]
+            ? [fila.curso, fila.id, fila.nombre, fila.actualizacion, fila.modalidad]
+            : [fila.id, fila.nombre, fila.actualizacion, fila.modalidad]
     );
     const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -350,6 +352,7 @@ function renderModalidadContent() {
                     <thead>
                         <tr>
                             ${esTodos ? "<th>Curso</th>" : ""}
+                            <th>ID</th>
                             <th>Nombre</th>
                             <th>Actualización</th>
                             <th>Modalidad</th>
@@ -361,6 +364,7 @@ function renderModalidadContent() {
                                 (fila) => `
                                     <tr>
                                         ${esTodos ? `<td>${getCursoLabel(fila.curso)}</td>` : ""}
+                                        <td>${fila.id}</td>
                                         <td>${fila.nombre}</td>
                                         <td>${fila.completado ? fila.actualizacion : `<span class="table-status pending">${fila.actualizacion}</span>`}</td>
                                         <td>${fila.completado ? fila.modalidad : `<span class="table-status pending">${fila.modalidad}</span>`}</td>
