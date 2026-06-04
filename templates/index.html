@@ -20,7 +20,6 @@
         <section class="section">
             <div class="section-title">
                 <div>
-                    <h2>Resumen general</h2>
                     <p id="ultimaActualizacion">Cargando datos...</p>
                 </div>
             </div>
@@ -56,22 +55,28 @@
                     <p>Se muestran 20 registros por página.</p>
                 </div>
             </div>
-            <div class="filter-group">
-                <p class="filter-label">División académica</p>
-                <div id="divisionTabs" class="tabs division-filter-tabs"></div>
-            </div>
-            <div class="filter-group">
-                <p class="filter-label">Curso</p>
-                <div id="modalidadTabs" class="tabs course-filter-tabs"></div>
-            </div>
+                <div class="filter-group">
+                    <p class="filter-label">División académica</p>
+                    <div id="divisionTabs" class="tabs division-filter-tabs"></div>
+                </div>
+
+                <div class="filter-group">
+                    <p class="filter-label">Carrera</p>
+                    <select id="careerSelect" class="sort-select career-select"></select>
+                </div>
+
+                <div class="filter-group">
+                    <p class="filter-label">Curso</p>
+                    <div id="modalidadTabs" class="tabs course-filter-tabs"></div>
+                </div>
             <div class="list-toolbar">
                 <label for="sortSelect">Ordenar por</label>
                 <select id="sortSelect" class="sort-select">
+                    <option value="az">Alfabético A-Z</option>
+                    <option value="za">Alfabético Z-A</option>
                     <option value="recientes">Más recientes primero</option>
                     <option value="id">ID menor a mayor</option>
                     <option value="id_desc">ID mayor a menor</option>
-                    <option value="az">Alfabético A-Z</option>
-                    <option value="za">Alfabético Z-A</option>
                     <option value="pendientes">Pendientes primero</option>
                     <option value="completados">Completados primero</option>
                     <option value="modalidad">Modalidad</option>
@@ -80,6 +85,10 @@
             </div>
             <div id="modalidadContent"></div>
         </section>
+
+        <footer class="page-footer">
+            <p>Dudas y comentarios: <a href="mailto:soporte.canvas@iest.edu.mx">soporte.canvas@iest.edu.mx</a></p>
+        </footer>
     </main>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>

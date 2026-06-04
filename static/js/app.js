@@ -3,6 +3,7 @@ let reporte = null;
 const TODOS_LOS_CURSOS = "__TODOS__";
 const CURSOS_1_Y_2 = "__CANVAS_1_2__";
 const TODAS_DIVISIONES = "__TODAS_DIVISIONES__";
+const TODAS_CARRERAS = "__TODAS_CARRERAS__";
 const DIVISIONES = [
     { key: "DCEA", label: "DCEA" },
     { key: "DCE", label: "DCE" },
@@ -15,7 +16,8 @@ const DIVISIONES = [
 
 let cursoActivo = CURSOS_1_Y_2;
 let divisionActiva = TODAS_DIVISIONES;
-let ordenLista = "recientes";
+let carreraActiva = TODAS_CARRERAS;
+let ordenLista = "az";
 const registrosPorPagina = 20;
 const paginasCurso = {};
 const TOTAL_PARTICIPANTES_FALLBACK = 276;
@@ -30,7 +32,7 @@ const normalize = (text) =>
         .replace(/[\u0300-\u036f]/g, "")
         .trim();
 
-const pageKey = (curso) => `${curso || CURSOS_1_Y_2}::${divisionActiva}::${ordenLista}`;
+const pageKey = (curso) => `${curso || CURSOS_1_Y_2}::${divisionActiva}::${carreraActiva}::${ordenLista}`;
 
 function cleanText(text) {
     const value = String(text || "").trim();
@@ -199,6 +201,7 @@ function renderReport() {
     renderCursoResumen();
     renderDivisionTabs();
     renderTabs();
+    renderCareerFilter();
     renderModalidadContent();
     renderSearchResults();
 }
@@ -249,8 +252,10 @@ function renderDivisionTabs() {
     container.querySelectorAll(".tab").forEach((tab) => {
         tab.addEventListener("click", () => {
             divisionActiva = tab.dataset.division;
+            carreraActiva = TODAS_CARRERAS;
             paginasCurso[pageKey(cursoActivo)] = 1;
             renderDivisionTabs();
+            renderCareerFilter();
             renderModalidadContent();
         });
     });
@@ -258,8 +263,13 @@ function renderDivisionTabs() {
 
 function getCourseDefinitions() {
     const oficiales = reporte?.cursos_oficiales || [];
+    const curso1 = oficiales[0];
+    const curso2 = oficiales[1];
+
     return [
-        { key: CURSOS_1_Y_2, label: "CANVAS 1 + CANVAS 2", cursos: oficiales.slice(0, 2), muestraCurso: true },
+        ...(curso1 && curso2 ? [{ key: CURSOS_1_Y_2, label: "CANVAS 1 + CANVAS 2", cursos: [curso1, curso2], muestraCurso: true }] : []),
+        ...(curso1 ? [{ key: curso1, label: "CANVAS 1", cursos: [curso1], muestraCurso: false }] : []),
+        ...(curso2 ? [{ key: curso2, label: "CANVAS 2", cursos: [curso2], muestraCurso: false }] : []),
         ...oficiales.slice(2).map((curso, index) => ({
             key: curso,
             label: `CANVAS ${index + 3}`,
@@ -303,6 +313,7 @@ function renderTabs() {
             cursoActivo = tab.dataset.curso;
             paginasCurso[pageKey(cursoActivo)] = 1;
             renderTabs();
+            renderCareerFilter();
             renderModalidadContent();
         });
     });
@@ -426,13 +437,61 @@ function ordenarFilas(filas) {
         },
     };
 
-    return [...filas].sort(ordenadores[ordenLista] || ordenadores.recientes);
+    return [...filas].sort(ordenadores[ordenLista] || ordenadores.az);
+}
+
+
+function getCarrerasDisponibles() {
+    const carreras = new Map();
+
+    getMaestrosBase().forEach((maestro) => {
+        if (divisionActiva !== TODAS_DIVISIONES && getDivisionKey(maestro.division) !== divisionActiva) return;
+
+        const carrera = getCarreraValue(maestro.carrera);
+        const key = normalize(carrera) || normalize("No disponible");
+
+        if (!carreras.has(key)) {
+            carreras.set(key, carrera);
+        }
+    });
+
+    return Array.from(carreras.values()).sort((a, b) => {
+        if (normalize(a) === "no disponible") return 1;
+        if (normalize(b) === "no disponible") return -1;
+        return a.localeCompare(b, "es");
+    });
+}
+
+function renderCareerFilter() {
+    const select = $("#careerSelect");
+    if (!select || !reporte) return;
+
+    const carreras = getCarrerasDisponibles();
+    const carreraKeys = new Set(carreras.map((carrera) => normalize(carrera)));
+
+    if (carreraActiva !== TODAS_CARRERAS && !carreraKeys.has(carreraActiva)) {
+        carreraActiva = TODAS_CARRERAS;
+    }
+
+    select.innerHTML = [
+        `<option value="${TODAS_CARRERAS}">Todas</option>`,
+        ...carreras.map((carrera) => {
+            const key = normalize(carrera);
+            return `<option value="${escapeHtml(key)}">${escapeHtml(carrera)}</option>`;
+        }),
+    ].join("");
+
+    select.value = carreraActiva;
 }
 
 function aplicarFiltrosAcademicos(filas) {
     return filas.filter((fila) => {
         const division = getDivisionKey(fila.division);
         if (divisionActiva !== TODAS_DIVISIONES && division !== divisionActiva) return false;
+
+        const carrera = normalize(getCarreraValue(fila.carrera));
+        if (carreraActiva !== TODAS_CARRERAS && carrera !== carreraActiva) return false;
+
         return true;
     });
 }
@@ -747,8 +806,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const sortSelect = $("#sortSelect");
     if (sortSelect) {
+        sortSelect.value = ordenLista;
         sortSelect.addEventListener("change", () => {
             ordenLista = sortSelect.value;
+            paginasCurso[pageKey(cursoActivo)] = 1;
+            renderModalidadContent();
+        });
+    }
+
+    const careerSelect = $("#careerSelect");
+    if (careerSelect) {
+        careerSelect.addEventListener("change", () => {
+            carreraActiva = careerSelect.value;
             paginasCurso[pageKey(cursoActivo)] = 1;
             renderModalidadContent();
         });

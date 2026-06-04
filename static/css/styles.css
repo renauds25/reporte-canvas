@@ -1101,3 +1101,64 @@ code {
         align-items: flex-start;
     }
 }
+
+.page-footer {
+    margin-top: 36px;
+    padding: 22px 0 8px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 15px;
+}
+
+.page-footer p {
+    margin: 0;
+}
+
+.page-footer a {
+    color: var(--primary);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.page-footer a:hover {
+    text-decoration: underline;
+}
+
+.career-filter-group {
+    margin-top: 2px;
+}
+
+.career-toolbar {
+    display: flex;
+    justify-content: center;
+    margin: 0 0 18px;
+}
+
+.career-select {
+    display: block;
+    width: min(640px, 100%);
+    margin: 0 auto;
+}
+
+@media (max-width: 760px) {
+    .career-toolbar {
+        justify-content: flex-start;
+    }
+
+    .career-select {
+        width: 100%;
+    }
+}
+
+.career-select,
+#careerSelect {
+    display: block;
+    width: min(640px, 100%);
+    margin: 0 auto;
+    text-align: center;
+    text-align-last: center;
+}
+
+#careerSelect option {
+    text-align: center;
+}
