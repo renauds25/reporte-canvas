@@ -233,6 +233,7 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
     conteo_por_curso_unico: dict[str, set[str]] = {curso: set() for curso in CURSOS_OFICIALES}
     registros_unicos_total: set[tuple[str, str]] = set()
     registros_sin_coincidencia: list[dict[str, str]] = []
+    registros_detalle: list[dict[str, str]] = []
 
     for row in rows:
         persona_key, master_user, match_type = resolve_person(row, by_id, by_email, by_name)
@@ -251,6 +252,18 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
 
         if match_type == "sin_coincidencia":
             registros_sin_coincidencia.append(resolved)
+
+        registros_detalle.append({
+            "id": resolved["id"],
+            "nombre": resolved["nombre"] or "Sin nombre",
+            "correo": resolved["correo"],
+            "carrera": resolved.get("carrera", ""),
+            "division": resolved.get("division", ""),
+            "curso": resolved["curso"],
+            "modalidad": resolved["modalidad"],
+            "fecha_actualizacion": resolved["fecha_actualizacion"],
+            "coincidencia": match_type,
+        })
 
         if persona_key not in personas:
             personas[persona_key] = {
@@ -363,6 +376,7 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
         "conteo_por_modalidad": conteo_por_modalidad,
         "conteo_por_curso": conteo_por_curso,
         "por_modalidad": por_modalidad,
+        "registros_detalle": sorted(registros_detalle, key=lambda item: parse_date(item["fecha_actualizacion"]), reverse=True),
         "personas": personas_lista,
         "usuarios_lista": sorted(users, key=lambda user: norm(user.get("nombre", ""))),
         "usuarios_sin_iniciar_lista": usuarios_sin_iniciar,

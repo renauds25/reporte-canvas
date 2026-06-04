@@ -35,7 +35,7 @@
             <section class="section panel">
                 <h2>1. Subir base maestra de usuarios</h2>
                 <p>Este archivo ayuda a completar nombres, correos e IDs cuando el CSV de capacitaciones venga incompleto.</p>
-                <pre class="code">id,nombre,correo</pre>
+                <pre class="code">id,nombre,correo,carrera,division</pre>
 
                 <form method="post" action="/admin/upload/usuarios" enctype="multipart/form-data" class="form">
                     <label for="usuarios">Archivo CSV de usuarios</label>
@@ -47,7 +47,7 @@
             <section class="section panel">
                 <h2>2. Subir CSV de capacitaciones</h2>
                 <p>Puede traer nombre incompleto o correo vacío, siempre que tenga ID o algún dato que coincida con la base maestra.</p>
-                <pre class="code">id,nombre,correo,curso,modalidad,fecha_actualizacion</pre>
+                <pre class="code">id,nombre,carrera,division,curso,modalidad,fecha_actualizacion</pre>
                 <p class="muted">La columna <code>correo</code> se recomienda, pero el sistema también acepta el formato anterior sin correo.</p>
 
                 <form method="post" action="/admin/upload/capacitaciones" enctype="multipart/form-data" class="form">
@@ -86,6 +86,47 @@
                     </article>
                 </div>
                 <p class="muted">Registros sin coincidencia en base maestra: {{ reporte.total_registros_sin_coincidencia }}</p>
+            </section>
+
+
+            <section class="section panel admin-metrics-panel">
+                <h2>Avance cursos CANVAS 1 y CANVAS 2</h2>
+                {% set total_canvas_1_2 = reporte.total_usuarios_esperados or reporte.total_personas %}
+                {% set avance_canvas_1_2 = reporte.personas_con_cursos_1_y_2 %}
+                {% set pendientes_canvas_1_2 = [total_canvas_1_2 - avance_canvas_1_2, 0] | max %}
+                {% set porcentaje_canvas_1_2 = (avance_canvas_1_2 / total_canvas_1_2 * 100) if total_canvas_1_2 else 0 %}
+                <div class="admin-dashboard-grid">
+                    <div class="pie-layout admin-pie-layout">
+                        <div class="pie-chart" style="--pie-value: {{ porcentaje_canvas_1_2 * 3.6 }}deg" data-percent="{{ '%.1f'|format(porcentaje_canvas_1_2) }}%" aria-label="Avance cursos CANVAS 1 y CANVAS 2"></div>
+                        <div class="pie-legend">
+                            <div class="legend-item success">
+                                <span class="legend-dot"></span>
+                                <div>
+                                    <strong>{{ avance_canvas_1_2 }}</strong>
+                                    <small>Maestros que completaron ambos cursos</small>
+                                </div>
+                            </div>
+                            <div class="legend-item pending">
+                                <span class="legend-dot"></span>
+                                <div>
+                                    <strong>{{ pendientes_canvas_1_2 }}</strong>
+                                    <small>Maestros pendientes por completarlos</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="admin-modalidad-card">
+                        <h3>Conteo por modalidad</h3>
+                        <div class="summary-list">
+                            {% for modalidad, total in reporte.conteo_por_modalidad.items() %}
+                                <div class="summary-row">
+                                    <span>{{ modalidad }}</span>
+                                    <strong>{{ total }}</strong>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section class="section panel">
