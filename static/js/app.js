@@ -28,7 +28,12 @@ const normalize = (text) =>
 const pageKey = (curso) => `${curso || TODOS_LOS_CURSOS}::${divisionActiva}::${ordenLista}`;
 
 function cleanText(text) {
-    return String(text || "").trim();
+    const value = String(text || "").trim();
+    const normalized = value.toLowerCase();
+    if (["null", "none", "nan", "n/a", "na", "sin dato", "sin datos"].includes(normalized)) {
+        return "";
+    }
+    return value;
 }
 
 function getDivisionKey(value) {
@@ -36,11 +41,17 @@ function getDivisionKey(value) {
     const valueNorm = normalize(raw);
 
     if (!valueNorm || valueNorm === "no disponible") return "Otros";
+    if (
+        valueNorm === "otros" ||
+        valueNorm === "otro" ||
+        valueNorm.includes("formacion integral") ||
+        valueNorm.includes("identidad catolica") ||
+        valueNorm.includes("preparatoria")
+    ) return "Otros";
     if (valueNorm === "dcea" || valueNorm.includes("economico") || valueNorm.includes("administrativa")) return "DCEA";
     if (valueNorm === "dce" || valueNorm.includes("exactas")) return "DCE";
     if (valueNorm === "dh" || valueNorm.includes("humanidades")) return "DH";
     if (valueNorm === "dcs" || valueNorm.includes("salud")) return "DCS";
-    if (valueNorm === "otros" || valueNorm === "otro") return "Otros";
 
     return raw;
 }
@@ -50,9 +61,78 @@ function getCarreraValue(value) {
     return carrera || "No disponible";
 }
 
+function getCarreraAbreviada(value) {
+    const carrera = getCarreraValue(value);
+    const carreraNorm = normalize(carrera);
+
+    if (!carreraNorm || carreraNorm === "no disponible") return "ND";
+
+    const palabras = carrera
+        .split(/\s+/)
+        .map((word) => word.trim())
+        .filter(Boolean)
+        .filter((word) => !["de", "del", "la", "las", "el", "los", "y", "e", "en"].includes(normalize(word)));
+
+    if (!palabras.length) return "ND";
+
+    return palabras
+        .map((word) => word[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 8);
+}
+
+function getCarreraTooltip(value) {
+    const carrera = getCarreraValue(value);
+    return carrera || "No disponible";
+}
+
+function renderCarreraCell(value) {
+    const abreviada = getCarreraAbreviada(value);
+    const tooltip = getCarreraTooltip(value);
+    return `<span class="career-badge" title="${tooltip}">${abreviada}</span>`;
+}
+
+function getDivisionValue(value) {
+    const division = cleanText(value);
+    return division || "No disponible";
+}
+
 function getDivisionLabel(key) {
     const match = DIVISIONES.find((division) => division.key === key);
     return match ? match.label : key;
+}
+
+function getDivisionAbreviada(value) {
+    const division = getDivisionValue(value);
+    const divisionNorm = normalize(division);
+    const key = getDivisionKey(division);
+
+    if (["DCEA", "DCE", "DH", "DCS"].includes(key)) return key;
+    if (!divisionNorm || divisionNorm === "no disponible") return "ND";
+
+    if (divisionNorm.includes("formacion integral") && divisionNorm.includes("identidad catolica")) return "DFIIC";
+    if (divisionNorm.includes("formacion integral")) return "DFI";
+    if (divisionNorm.includes("preparatoria")) return "DP";
+
+    return division
+        .split(/\s+/)
+        .filter((word) => !["de", "del", "la", "las", "el", "los", "y", "e"].includes(normalize(word)))
+        .map((word) => word[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 6) || "ND";
+}
+
+function getDivisionTooltip(value) {
+    const division = getDivisionValue(value);
+    return division || "No disponible";
+}
+
+function renderDivisionCell(value) {
+    const abreviada = getDivisionAbreviada(value);
+    const tooltip = getDivisionTooltip(value);
+    return `<span class="division-badge" title="${tooltip}">${abreviada}</span>`;
 }
 
 function formatFecha(fecha) {
@@ -416,8 +496,8 @@ function exportarTablaCurso(curso) {
         : ["id", "nombre", "carrera", "division", "actualizacion", "modalidad"];
     const rows = filas.map((fila) =>
         esTodos
-            ? [fila.curso, fila.id, fila.nombre, fila.carrera, getDivisionLabel(getDivisionKey(fila.division)), fila.actualizacion, fila.modalidad]
-            : [fila.id, fila.nombre, fila.carrera, getDivisionLabel(getDivisionKey(fila.division)), fila.actualizacion, fila.modalidad]
+            ? [fila.curso, fila.id, fila.nombre, fila.carrera, getDivisionValue(fila.division), fila.actualizacion, fila.modalidad]
+            : [fila.id, fila.nombre, fila.carrera, getDivisionValue(fila.division), fila.actualizacion, fila.modalidad]
     );
     const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -465,13 +545,13 @@ function renderModalidadContent() {
                 <table>
                     <thead>
                         <tr>
-                            ${esTodos ? "<th>Curso</th>" : ""}
-                            <th>ID</th>
-                            <th>Nombre</th>
-                            <th>Carrera</th>
-                            <th>División</th>
-                            <th>Actualización</th>
-                            <th>Modalidad</th>
+                            ${esTodos ? '<th class="col-curso">Curso</th>' : ""}
+                            <th class="col-id">ID</th>
+                            <th class="col-nombre">Nombre</th>
+                            <th class="col-carrera">Carrera</th>
+                            <th class="col-division">División</th>
+                            <th class="col-actualizacion">Actualización</th>
+                            <th class="col-modalidad">Modalidad</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -479,13 +559,13 @@ function renderModalidadContent() {
                             .map(
                                 (fila) => `
                                     <tr>
-                                        ${esTodos ? `<td>${getCursoLabel(fila.curso)}</td>` : ""}
-                                        <td>${fila.id}</td>
-                                        <td>${fila.nombre}</td>
-                                        <td>${fila.carrera}</td>
-                                        <td>${getDivisionLabel(getDivisionKey(fila.division))}</td>
-                                        <td>${fila.completado ? fila.actualizacion : `<span class="table-status pending">${fila.actualizacion}</span>`}</td>
-                                        <td>${fila.completado ? fila.modalidad : `<span class="table-status pending">${fila.modalidad}</span>`}</td>
+                                        ${esTodos ? `<td class="col-curso">${getCursoLabel(fila.curso)}</td>` : ""}
+                                        <td class="col-id">${fila.id}</td>
+                                        <td class="col-nombre">${fila.nombre}</td>
+                                        <td class="col-carrera">${renderCarreraCell(fila.carrera)}</td>
+                                        <td class="col-division">${renderDivisionCell(fila.division)}</td>
+                                        <td class="col-actualizacion">${fila.completado ? fila.actualizacion : `<span class="table-status pending">${fila.actualizacion}</span>`}</td>
+                                        <td class="col-modalidad">${fila.completado ? fila.modalidad : `<span class="table-status pending">${fila.modalidad}</span>`}</td>
                                     </tr>
                                 `
                             )
@@ -565,7 +645,7 @@ function renderSearchResults() {
                     <div class="person-header">
                         <div>
                             <h3>${persona.nombre || "Sin nombre"}</h3>
-                            <p class="muted small-note">${getCarreraValue(persona.carrera)} · ${getDivisionLabel(getDivisionKey(persona.division))}</p>
+                            <p class="muted small-note">${getCarreraValue(persona.carrera)} · ${getDivisionValue(persona.division)}</p>
                         </div>
                         <span class="status ${persona.completo ? "done" : "pending"}">
                             ${persona.completo ? "Completo" : `Número de cursos pendientes: ${persona.pendientes}`}

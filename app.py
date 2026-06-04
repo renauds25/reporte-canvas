@@ -88,7 +88,10 @@ def template_context() -> dict[str, Any]:
 
 
 def clean(value: Any) -> str:
-    return str(value or "").strip()
+    text = str(value or "").strip()
+    if text.lower() in {"null", "none", "nan", "n/a", "na", "sin dato", "sin datos"}:
+        return ""
+    return text
 
 
 def norm(value: Any) -> str:
