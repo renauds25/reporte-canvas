@@ -435,6 +435,11 @@ function ordenarFilas(filas) {
             if (comparacionDivision !== 0) return comparacionDivision;
             return a.nombre.localeCompare(b.nombre, "es");
         },
+        carrera: (a, b) => {
+            const comparacionCarrera = getCarreraValue(a.carrera).localeCompare(getCarreraValue(b.carrera), "es");
+            if (comparacionCarrera !== 0) return comparacionCarrera;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
     };
 
     return [...filas].sort(ordenadores[ordenLista] || ordenadores.az);
