@@ -932,3 +932,51 @@ code {
         justify-content: flex-start;
     }
 }
+
+/* Filtros académicos: división, licenciatura y curso */
+.filter-group {
+    margin-bottom: 14px;
+}
+
+.filter-label {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-weight: 700;
+    text-align: center;
+}
+
+.division-filter-tabs,
+.course-filter-tabs {
+    justify-content: center;
+}
+
+.division-filter-tabs .tab,
+.course-filter-tabs .tab {
+    min-width: 128px;
+}
+
+.career-toolbar {
+    justify-content: center;
+    margin: 0 0 18px;
+}
+
+.career-toolbar .sort-select {
+    min-width: min(420px, 100%);
+}
+
+.selected-course-table th,
+.selected-course-table td {
+    vertical-align: middle;
+}
+
+@media (max-width: 760px) {
+    .division-filter-tabs,
+    .course-filter-tabs {
+        justify-content: flex-start;
+    }
+
+    .career-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

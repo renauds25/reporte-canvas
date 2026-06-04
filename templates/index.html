@@ -23,7 +23,6 @@
                     <h2>Resumen general</h2>
                     <p id="ultimaActualizacion">Cargando datos...</p>
                 </div>
-                <button id="refreshBtn" class="btn secondary">Actualizar</button>
             </div>
 
             <article class="panel pie-panel pie-panel-first">
@@ -84,7 +83,14 @@
                     <p>Se muestran 20 registros por página. Puedes filtrar por curso y ordenar la lista.</p>
                 </div>
             </div>
-            <div id="modalidadTabs" class="tabs course-filter-tabs"></div>
+            <div class="filter-group">
+                <p class="filter-label">División académica</p>
+                <div id="divisionTabs" class="tabs division-filter-tabs"></div>
+            </div>
+            <div class="filter-group">
+                <p class="filter-label">Curso</p>
+                <div id="modalidadTabs" class="tabs course-filter-tabs"></div>
+            </div>
             <div class="list-toolbar">
                 <label for="sortSelect">Ordenar por</label>
                 <select id="sortSelect" class="sort-select">
@@ -96,6 +102,7 @@
                     <option value="pendientes">Pendientes primero</option>
                     <option value="completados">Completados primero</option>
                     <option value="modalidad">Modalidad</option>
+                    <option value="division">División</option>
                 </select>
             </div>
             <div id="modalidadContent"></div>

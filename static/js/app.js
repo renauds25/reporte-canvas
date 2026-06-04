@@ -1,6 +1,16 @@
 let reporte = null;
 const TODOS_LOS_CURSOS = "__TODOS__";
+const TODAS_DIVISIONES = "__TODAS_DIVISIONES__";
+const DIVISIONES = [
+    { key: TODAS_DIVISIONES, label: "Todas" },
+    { key: "DCEA", label: "DCEA" },
+    { key: "DCE", label: "DCE" },
+    { key: "DH", label: "DH" },
+    { key: "DCS", label: "DCS" },
+    { key: "Otros", label: "Otros" },
+];
 let cursoActivo = TODOS_LOS_CURSOS;
+let divisionActiva = TODAS_DIVISIONES;
 let ordenLista = "recientes";
 const registrosPorPagina = 20;
 const paginasCurso = {};
@@ -15,7 +25,35 @@ const normalize = (text) =>
         .replace(/[\u0300-\u036f]/g, "")
         .trim();
 
-const pageKey = (curso) => `${curso || TODOS_LOS_CURSOS}::${ordenLista}`;
+const pageKey = (curso) => `${curso || TODOS_LOS_CURSOS}::${divisionActiva}::${ordenLista}`;
+
+function cleanText(text) {
+    return String(text || "").trim();
+}
+
+function getDivisionKey(value) {
+    const raw = cleanText(value);
+    const valueNorm = normalize(raw);
+
+    if (!valueNorm || valueNorm === "no disponible") return "Otros";
+    if (valueNorm === "dcea" || valueNorm.includes("economico") || valueNorm.includes("administrativa")) return "DCEA";
+    if (valueNorm === "dce" || valueNorm.includes("exactas")) return "DCE";
+    if (valueNorm === "dh" || valueNorm.includes("humanidades")) return "DH";
+    if (valueNorm === "dcs" || valueNorm.includes("salud")) return "DCS";
+    if (valueNorm === "otros" || valueNorm === "otro") return "Otros";
+
+    return raw;
+}
+
+function getCarreraValue(value) {
+    const carrera = cleanText(value);
+    return carrera || "No disponible";
+}
+
+function getDivisionLabel(key) {
+    const match = DIVISIONES.find((division) => division.key === key);
+    return match ? match.label : key;
+}
 
 function formatFecha(fecha) {
     if (!fecha) return "-";
@@ -80,6 +118,7 @@ function renderReport() {
 
     renderPieCursosUnoDos();
     renderCursoResumen();
+    renderDivisionTabs();
     renderTabs();
     renderModalidadContent();
     renderSearchResults();
@@ -130,6 +169,29 @@ function renderCursoResumen() {
         })
         .join("");
 }
+
+function renderDivisionTabs() {
+    const container = $("#divisionTabs");
+    if (!container) return;
+
+    container.innerHTML = DIVISIONES.map(
+        (division) => `
+            <button class="tab ${division.key === divisionActiva ? "active" : ""}" data-division="${division.key}">
+                ${division.label}
+            </button>
+        `
+    ).join("");
+
+    container.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+            divisionActiva = tab.dataset.division;
+            paginasCurso[pageKey(cursoActivo)] = 1;
+            renderDivisionTabs();
+                    renderModalidadContent();
+        });
+    });
+}
+
 
 function getCursoLabel(curso) {
     if (curso === TODOS_LOS_CURSOS) return "Todos";
@@ -191,19 +253,28 @@ function getPersonasPorKey() {
 }
 
 function getMaestrosBase() {
+    const personasPorKey = getPersonasPorKey();
     const usuarios = reporte.usuarios_lista || [];
+
     if (usuarios.length) {
-        return usuarios.map((usuario) => ({
-            id: usuario.id || "",
-            nombre: usuario.nombre || "Sin nombre",
-            correo: usuario.correo || "",
-        }));
+        return usuarios.map((usuario) => {
+            const persona = personasPorKey.get(getPersonaKey(usuario));
+            return {
+                id: usuario.id || persona?.id || "",
+                nombre: usuario.nombre || persona?.nombre || "Sin nombre",
+                correo: usuario.correo || persona?.correo || "",
+                carrera: usuario.carrera || persona?.carrera || "No disponible",
+                division: usuario.division || persona?.division || "No disponible",
+            };
+        });
     }
 
     return (reporte.personas || []).map((persona) => ({
         id: persona.id || "",
         nombre: persona.nombre || "Sin nombre",
         correo: persona.correo || "",
+        carrera: persona.carrera || "No disponible",
+        division: persona.division || "No disponible",
     }));
 }
 
@@ -271,21 +342,61 @@ function ordenarFilas(filas) {
             if (comparacionModalidad !== 0) return comparacionModalidad;
             return a.nombre.localeCompare(b.nombre, "es");
         },
+        division: (a, b) => {
+            const comparacionDivision = getDivisionKey(a.division).localeCompare(getDivisionKey(b.division), "es");
+            if (comparacionDivision !== 0) return comparacionDivision;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
     };
 
     return [...filas].sort(ordenadores[ordenLista] || ordenadores.recientes);
 }
 
+function aplicarFiltrosAcademicos(filas) {
+    return filas.filter((fila) => {
+        const division = getDivisionKey(fila.division);
+        const carrera = getCarreraValue(fila.carrera);
+
+        if (divisionActiva !== TODAS_DIVISIONES && division !== divisionActiva) return false;
+
+        return true;
+    });
+}
+
 function getFilasCurso(curso) {
-    return ordenarFilas(
+    const filas = getMaestrosBase().map((maestro) => {
+        const registro = getRegistroCursoMaestro(maestro, curso);
+        const completado = Boolean(registro);
+        const fecha = registro?.fecha_actualizacion || "";
+
+        return {
+            id: maestro.id || "-",
+            nombre: maestro.nombre || "Sin nombre",
+            carrera: getCarreraValue(registro?.carrera || maestro.carrera),
+            division: registro?.division || maestro.division || "No disponible",
+            actualizacion: completado ? formatFecha(fecha) : "Pendiente",
+            modalidad: completado ? registro.modalidad : "Pendiente",
+            completado,
+            fecha_orden: parseFechaOrden(fecha),
+        };
+    });
+
+    return ordenarFilas(aplicarFiltrosAcademicos(filas));
+}
+
+function getFilasTodos() {
+    const filas = (reporte.cursos_oficiales || []).flatMap((curso) =>
         getMaestrosBase().map((maestro) => {
             const registro = getRegistroCursoMaestro(maestro, curso);
             const completado = Boolean(registro);
             const fecha = registro?.fecha_actualizacion || "";
 
             return {
+                curso,
                 id: maestro.id || "-",
                 nombre: maestro.nombre || "Sin nombre",
+                carrera: getCarreraValue(registro?.carrera || maestro.carrera),
+                division: registro?.division || maestro.division || "No disponible",
                 actualizacion: completado ? formatFecha(fecha) : "Pendiente",
                 modalidad: completado ? registro.modalidad : "Pendiente",
                 completado,
@@ -293,38 +404,20 @@ function getFilasCurso(curso) {
             };
         })
     );
-}
 
-function getFilasTodos() {
-    return ordenarFilas(
-        (reporte.cursos_oficiales || []).flatMap((curso) =>
-            getMaestrosBase().map((maestro) => {
-                const registro = getRegistroCursoMaestro(maestro, curso);
-                const completado = Boolean(registro);
-                const fecha = registro?.fecha_actualizacion || "";
-
-                return {
-                    curso,
-                    id: maestro.id || "-",
-                    nombre: maestro.nombre || "Sin nombre",
-                    actualizacion: completado ? formatFecha(fecha) : "Pendiente",
-                    modalidad: completado ? registro.modalidad : "Pendiente",
-                    completado,
-                    fecha_orden: parseFechaOrden(fecha),
-                };
-            })
-        )
-    );
+    return ordenarFilas(aplicarFiltrosAcademicos(filas));
 }
 
 function exportarTablaCurso(curso) {
     const esTodos = curso === TODOS_LOS_CURSOS;
     const filas = esTodos ? getFilasTodos() : getFilasCurso(curso);
-    const headers = esTodos ? ["curso", "id", "nombre", "actualizacion", "modalidad"] : ["id", "nombre", "actualizacion", "modalidad"];
+    const headers = esTodos
+        ? ["curso", "id", "nombre", "carrera", "division", "actualizacion", "modalidad"]
+        : ["id", "nombre", "carrera", "division", "actualizacion", "modalidad"];
     const rows = filas.map((fila) =>
         esTodos
-            ? [fila.curso, fila.id, fila.nombre, fila.actualizacion, fila.modalidad]
-            : [fila.id, fila.nombre, fila.actualizacion, fila.modalidad]
+            ? [fila.curso, fila.id, fila.nombre, fila.carrera, getDivisionLabel(getDivisionKey(fila.division)), fila.actualizacion, fila.modalidad]
+            : [fila.id, fila.nombre, fila.carrera, getDivisionLabel(getDivisionKey(fila.division)), fila.actualizacion, fila.modalidad]
     );
     const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -375,6 +468,8 @@ function renderModalidadContent() {
                             ${esTodos ? "<th>Curso</th>" : ""}
                             <th>ID</th>
                             <th>Nombre</th>
+                            <th>Carrera</th>
+                            <th>División</th>
                             <th>Actualización</th>
                             <th>Modalidad</th>
                         </tr>
@@ -387,6 +482,8 @@ function renderModalidadContent() {
                                         ${esTodos ? `<td>${getCursoLabel(fila.curso)}</td>` : ""}
                                         <td>${fila.id}</td>
                                         <td>${fila.nombre}</td>
+                                        <td>${fila.carrera}</td>
+                                        <td>${getDivisionLabel(getDivisionKey(fila.division))}</td>
                                         <td>${fila.completado ? fila.actualizacion : `<span class="table-status pending">${fila.actualizacion}</span>`}</td>
                                         <td>${fila.completado ? fila.modalidad : `<span class="table-status pending">${fila.modalidad}</span>`}</td>
                                     </tr>
@@ -429,6 +526,8 @@ function getPersonasBusqueda() {
             id: maestro.id || "",
             nombre: maestro.nombre || "Sin nombre",
             correo: maestro.correo || "",
+            carrera: maestro.carrera || "No disponible",
+            division: maestro.division || "No disponible",
             cursos: [],
             total_cursos: 0,
             completo: false,
@@ -466,6 +565,7 @@ function renderSearchResults() {
                     <div class="person-header">
                         <div>
                             <h3>${persona.nombre || "Sin nombre"}</h3>
+                            <p class="muted small-note">${getCarreraValue(persona.carrera)} · ${getDivisionLabel(getDivisionKey(persona.division))}</p>
                         </div>
                         <span class="status ${persona.completo ? "done" : "pending"}">
                             ${persona.completo ? "Completo" : `Número de cursos pendientes: ${persona.pendientes}`}
@@ -504,8 +604,17 @@ function renderSearchResults() {
 
 document.addEventListener("DOMContentLoaded", () => {
     loadReport();
-    $("#searchInput").addEventListener("input", renderSearchResults);
-    $("#refreshBtn").addEventListener("click", loadReport);
+
+    const searchInput = $("#searchInput");
+    if (searchInput) {
+        searchInput.addEventListener("input", renderSearchResults);
+    }
+
+    const refreshBtn = $("#refreshBtn");
+    if (refreshBtn) {
+        refreshBtn.addEventListener("click", loadReport);
+    }
+
     const sortSelect = $("#sortSelect");
     if (sortSelect) {
         sortSelect.addEventListener("change", () => {

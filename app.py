@@ -137,6 +137,8 @@ def normalize_user_row(row: dict[str, str]) -> dict[str, str]:
         "id": get_value(row, "id", "ID", "matricula", "matrícula", "numero", "número"),
         "nombre": get_value(row, "nombre", "Nombre", "name", "participante"),
         "correo": get_value(row, "correo", "Correo", "email", "mail", "e-mail"),
+        "carrera": get_value(row, "carrera", "Carrera", "licenciatura", "Licenciatura", "programa", "Programa"),
+        "division": get_value(row, "division", "División", "Division", "dirección", "Direccion", "area", "Área"),
     }
 
 
@@ -145,6 +147,8 @@ def normalize_training_row(row: dict[str, str]) -> dict[str, str]:
         "id": get_value(row, "id", "ID", "matricula", "matrícula", "numero", "número"),
         "nombre": get_value(row, "nombre", "Nombre", "name", "participante"),
         "correo": get_value(row, "correo", "Correo", "email", "mail", "e-mail"),
+        "carrera": get_value(row, "carrera", "Carrera", "licenciatura", "Licenciatura", "programa", "Programa"),
+        "division": get_value(row, "division", "División", "Division", "dirección", "Direccion", "area", "Área"),
         "curso": get_value(row, "curso", "Curso"),
         "modalidad": get_value(row, "modalidad", "Modalidad"),
         "fecha_actualizacion": get_value(row, "fecha_actualizacion", "Fecha_actualizacion", "fecha", "Fecha", "actualizacion", "actualización"),
@@ -234,6 +238,8 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
             "id": master_user["id"] if master_user and master_user["id"] else row["id"],
             "nombre": master_user["nombre"] if master_user and master_user["nombre"] else row["nombre"],
             "correo": master_user["correo"] if master_user and master_user["correo"] else row["correo"],
+            "carrera": master_user.get("carrera", "") if master_user and master_user.get("carrera") else row.get("carrera", ""),
+            "division": master_user.get("division", "") if master_user and master_user.get("division") else row.get("division", ""),
             "curso": row["curso"],
             "modalidad": row["modalidad"],
             "fecha_actualizacion": row["fecha_actualizacion"],
@@ -248,6 +254,8 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
                 "id": resolved["id"],
                 "nombre": resolved["nombre"] or "Sin nombre",
                 "correo": resolved["correo"],
+                "carrera": resolved.get("carrera", ""),
+                "division": resolved.get("division", ""),
                 "cursos": [],
                 "total_cursos": 0,
                 "completo": False,
@@ -260,8 +268,15 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
                 "curso": resolved["curso"],
                 "modalidad": resolved["modalidad"],
                 "fecha_actualizacion": resolved["fecha_actualizacion"],
+                "carrera": resolved.get("carrera", ""),
+                "division": resolved.get("division", ""),
             }
         )
+
+        if not personas[persona_key].get("carrera") and resolved.get("carrera"):
+            personas[persona_key]["carrera"] = resolved["carrera"]
+        if not personas[persona_key].get("division") and resolved.get("division"):
+            personas[persona_key]["division"] = resolved["division"]
 
         if parse_date(resolved["fecha_actualizacion"]) > parse_date(personas[persona_key]["ultima_actualizacion"]):
             personas[persona_key]["ultima_actualizacion"] = resolved["fecha_actualizacion"]
@@ -391,6 +406,15 @@ def api_reporte():
     return jsonify(build_report(rows, users))
 
 
+@app.get("/api/datos")
+@report_login_required
+def api_datos():
+    return jsonify({
+        "capacitaciones": read_capacitaciones(),
+        "usuarios": read_users(),
+    })
+
+
 @app.route("/admin", methods=["GET", "POST"])
 @report_login_required
 def admin():
@@ -459,7 +483,7 @@ def save_uploaded_csv(field_name: str, destination: Path, required_headers: set[
 @report_login_required
 @login_required
 def upload_capacitaciones():
-    required = {"id", "nombre", "curso", "modalidad", "fecha_actualizacion"}
+    required = {"id", "nombre", "carrera", "division", "curso", "modalidad", "fecha_actualizacion"}
     error = save_uploaded_csv("archivo", CAPACITACIONES_PATH, required)
     if error:
         rows = read_capacitaciones()
