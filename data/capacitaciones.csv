@@ -1,7 +1,7 @@
 ﻿id,nombre,carrera,division,curso,modalidad,fecha_actualizacion
-,JORGE TORRES ALMAZAN,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
+,JUAN CARLOS GONZÁLEZ PONCE,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
 ,ELVIRA ESTEPFANIA RIVERA GONZALEZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-,MARCELA CAVAZOS GAITAN,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
+,RAQUEL CHEW MONTERRUBIO,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,05/06/2026
 10113,BEATRIZ ALICIA TOLEDO MARTÍNEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 10113,BEATRIZ ALICIA TOLEDO MARTÍNEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
 10844,KARLA DENIS,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
@@ -13,7 +13,7 @@
 1288,ALFREDO ALFREDO CASTILLO,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
 13472,MARA PAOLA MUÑOZ RODRÍGUEZ,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
 13472,MARA PAOLA MUÑOZ RODRÍGUEZ,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
-13681,ICELA LILLÁN MATA LUNA,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
+13681,ICELA LILLÁN MATA LUNA,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
 13681,ICELA LILLÁN MATA LUNA,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 13681,ICELA LILLÁN MATA LUNA,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 13681,ICELA LILLÁN MATA LUNA,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
@@ -29,20 +29,23 @@
 13754,EMMA ISABEL MERINO HERNANDEZ,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Económico-Administrativas,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
 13754,EMMA ISABEL MERINO HERNANDEZ,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Económico-Administrativas,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
 13754,EMMA ISABEL MERINO HERNANDEZ,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Económico-Administrativas,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+13763,JUAN JOSÉ ALVARADO GUTIÉRREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 13845,ALFONSO MUÑÍZ PERALES,Licenciatura en Ingenieria Industrial,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
 13861,MARIA DE LOURDES JIMENEZ GONZALEZ,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
 1415,ROMEO CAVAZOS OLVERA,Licenciatura en Negocios Internacionales,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 1415,ROMEO CAVAZOS OLVERA,Licenciatura en Negocios Internacionales,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
 14322,JESUS MAGDIEL HERNANDEZ LAM,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+14322,JESUS MAGDIEL HERNANDEZ LAM,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 14331,LEÓN ALEJANDRO HERNÁNDEZ PÉREZ,Licenciatura en Filosofía,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
 14331,LEÓN ALEJANDRO HERNÁNDEZ PÉREZ,Licenciatura en Filosofía,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 14434,MARIA VICTORIA TRISTAN MACIAS,Licenciatura en Derecho,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
+14478,ANA YARELY CRUZ ZAPATA,Licenciatura en Diseño Gráfico,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
+14510,JUAN MANUEL VELÁZQUEZ ALTAMIRANO,Licenciatura en Diseño Gráfico,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
 14528,JOSE LUIS HORAK ROMO,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 14528,JOSE LUIS HORAK ROMO,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 14621,RODRIGO RUIZ ESPARZA MORENO,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
@@ -74,6 +77,7 @@
 15192,ÁNGEL ISSAC COMPARÁN FLORES,Licenciatura en Gastronomía,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
 15194,YOCELYN ANEDI AGUIRRE CHÁVEZ,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
 15194,YOCELYN ANEDI AGUIRRE CHÁVEZ,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
+15201,ADALBERTO ROSAS FRÍAS,Licenciatura en Derecho,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
 15205,ANGELITA GUTIERREZ ENRIQUEZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
 15654,LUIS FELIPE MEDINA DELGADO,Licenciatura en Gastronomía,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 15654,LUIS FELIPE MEDINA DELGADO,Licenciatura en Gastronomía,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
@@ -81,18 +85,18 @@
 15691,ÓSCAR MARTÍNEZ HERNÁNDEZ,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
 15795,LUIS BERNARDO RODRÍGUEZ LAMADRID,Licenciatura en Gastronomía,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
 15795,LUIS BERNARDO RODRÍGUEZ LAMADRID,Licenciatura en Gastronomía,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
-15817,PAOLA CHAVERO,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-15817,PAOLA CHAVERO,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-15817,PAOLA CHAVERO,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-15817,PAOLA CHAVERO,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-15817,PAOLA CHAVERO,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-15817,PAOLA CHAVERO,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-16156,ISAAC RAFAEL CERVANTES,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-16156,ISAAC RAFAEL CERVANTES,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-16156,ISAAC RAFAEL CERVANTES,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-16156,ISAAC RAFAEL CERVANTES,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-16156,ISAAC RAFAEL CERVANTES,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-16156,ISAAC RAFAEL CERVANTES,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+15817,PAOLA CHAVERO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+15817,PAOLA CHAVERO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+15817,PAOLA CHAVERO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+15817,PAOLA CHAVERO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+15817,PAOLA CHAVERO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+15817,PAOLA CHAVERO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+16156,ISAAC RAFAEL CERVANTES,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+16156,ISAAC RAFAEL CERVANTES,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+16156,ISAAC RAFAEL CERVANTES,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+16156,ISAAC RAFAEL CERVANTES,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+16156,ISAAC RAFAEL CERVANTES,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+16156,ISAAC RAFAEL CERVANTES,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 16360,DEISY DIANA HERNÁNDEZ NEGRETE,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 16360,DEISY DIANA HERNÁNDEZ NEGRETE,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
 16381,ROXANNA ALVARADO MASCORRO,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
@@ -102,6 +106,7 @@
 16437,PRISCILA ABIGAIL MARTÍNEZ ARAN,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 3. GRUPOS (EQUIPOS).,En línea,03/06/2026
 16437,PRISCILA ABIGAIL MARTÍNEZ ARAN,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 4. RÚBRICAS.,En línea,03/06/2026
 16486,JOSUÉ HELÍ JIMÉNEZ ARTEAGA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
+16486,JOSUÉ HELÍ JIMÉNEZ ARTEAGA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 1706,MONICA CRUZ VEGA,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 1706,MONICA CRUZ VEGA,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 17125,ALEJANDRA WAH AGUILAR,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
@@ -112,15 +117,16 @@
 17219,ADRIANA PEREZ PERALES RAMÍREZ,Licenciatura en Diseño Gráfico,Dirección de Humanidades,CANVAS 4. RÚBRICAS.,En línea,04/06/2026
 17297,ADRIÁN GONZÁLEZ TORRES,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 17297,ADRIÁN GONZÁLEZ TORRES,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
-17376,ALEXA GALLARDO REYES,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
+17376,ALEXA GALLARDO REYES,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
 17376,ALEXA GALLARDO REYES,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 17376,ALEXA GALLARDO REYES,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
 17416,ABRIL NAYELI BRICEÑO HERNANDEZ,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 17416,ABRIL NAYELI BRICEÑO HERNANDEZ,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 178,LIDIA YOLANDA ALCAZAR NAVARRETE,Licenciatura en Derecho,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
-178,LIDIA YOLANDA ALCAZAR NAVARRETE,Licenciatura en Derecho,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
+178,LIDIA YOLANDA ALCAZAR NAVARRETE,Licenciatura en Derecho,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,05/06/2026
 17861,RODOLFO MARCELO SCHLUFTER STOLBERG,Jefatura de Ciencias Básicas,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 17861,RODOLFO MARCELO SCHLUFTER STOLBERG,Jefatura de Ciencias Básicas,Dirección de Ciencias de la Salud,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
+17904,ANDREA MICHELLE RAMIREZ LUNA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
 17904,ANDREA MICHELLE RAMIREZ LUNA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
 17912,RENAUD SANTOS ROCHA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,En línea,03/06/2026
 17912,RENAUD SANTOS ROCHA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
@@ -130,24 +136,24 @@
 17912,RENAUD SANTOS ROCHA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
 17912,RENAUD SANTOS ROCHA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
 17912,RENAUD SANTOS ROCHA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-18147,LEILANI ENID LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-18147,LEILANI ENID LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-18147,LEILANI ENID LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-18147,LEILANI ENID LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-18147,LEILANI ENID LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-18147,LEILANI ENID LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-18253,BETSABÉ RODRÍGUEZ SILVA,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-18253,BETSABÉ RODRÍGUEZ SILVA,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-18253,BETSABÉ RODRÍGUEZ SILVA,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-18253,BETSABÉ RODRÍGUEZ SILVA,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-18253,BETSABÉ RODRÍGUEZ SILVA,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-18253,BETSABÉ RODRÍGUEZ SILVA,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-18393,HERIBERTO CEDILLO,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-18393,HERIBERTO CEDILLO,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-18393,HERIBERTO CEDILLO,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-18393,HERIBERTO CEDILLO,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-18393,HERIBERTO CEDILLO,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-18393,HERIBERTO CEDILLO,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+18147,LEILANI ENID LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+18147,LEILANI ENID LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+18147,LEILANI ENID LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+18147,LEILANI ENID LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+18147,LEILANI ENID LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+18147,LEILANI ENID LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+18253,BETSABÉ RODRÍGUEZ SILVA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+18253,BETSABÉ RODRÍGUEZ SILVA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+18253,BETSABÉ RODRÍGUEZ SILVA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+18253,BETSABÉ RODRÍGUEZ SILVA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+18253,BETSABÉ RODRÍGUEZ SILVA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+18253,BETSABÉ RODRÍGUEZ SILVA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+18393,HERIBERTO CEDILLO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+18393,HERIBERTO CEDILLO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+18393,HERIBERTO CEDILLO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+18393,HERIBERTO CEDILLO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+18393,HERIBERTO CEDILLO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+18393,HERIBERTO CEDILLO,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 18479,MARÍA FERNANDA LLAMA LOZA,Jefatura de Ciencias Básicas,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 18479,MARÍA FERNANDA LLAMA LOZA,Jefatura de Ciencias Básicas,Dirección de Ciencias de la Salud,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
 19009,REGINA BAZALDÚA ARMAS,Departamento de Finanzas y Economía,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
@@ -158,25 +164,27 @@
 19458,ROCÍO KARELIA DOMÍNGUEZ VERA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 19458,ROCÍO KARELIA DOMÍNGUEZ VERA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 19487,TANIA SARAI CASTILLO GOMEZ,No disponible,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
-19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-19917,JORGE LUIS SANTIAGO ENRIQUEZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-19917,JORGE LUIS SANTIAGO ENRIQUEZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-19917,JORGE LUIS SANTIAGO ENRIQUEZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-19917,JORGE LUIS SANTIAGO ENRIQUEZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-19917,JORGE LUIS SANTIAGO ENRIQUEZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-19917,JORGE LUIS SANTIAGO ENRIQUEZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-1992,ROSA DEL ÁNGEL VALDEZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-1992,ROSA DEL ÁNGEL VALDEZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-1992,ROSA DEL ÁNGEL VALDEZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-1992,ROSA DEL ÁNGEL VALDEZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-1992,ROSA DEL ÁNGEL VALDEZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-1992,ROSA DEL ÁNGEL VALDEZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+19792,AISLINN JESSAMYN LÓPEZ RAMÍREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+19909,JORGE ENRIQUE CORTÉS SÁNCHEZ,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
+19917,JORGE LUIS SANTIAGO ENRIQUEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+19917,JORGE LUIS SANTIAGO ENRIQUEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+19917,JORGE LUIS SANTIAGO ENRIQUEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+19917,JORGE LUIS SANTIAGO ENRIQUEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+19917,JORGE LUIS SANTIAGO ENRIQUEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+19917,JORGE LUIS SANTIAGO ENRIQUEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+1992,ROSA DEL ÁNGEL VALDEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+1992,ROSA DEL ÁNGEL VALDEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+1992,ROSA DEL ÁNGEL VALDEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+1992,ROSA DEL ÁNGEL VALDEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+1992,ROSA DEL ÁNGEL VALDEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+1992,ROSA DEL ÁNGEL VALDEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 20064,LUISA CRISTINA FREGOSO RIVERA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
+20064,LUISA CRISTINA FREGOSO RIVERA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 20366,FRIDA KARELL HERNÁNDEZ CASTILLO,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 20366,FRIDA KARELL HERNÁNDEZ CASTILLO,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 20604,SERGIO ANTONIO PADILLA TORRES,Licenciatura en Ingenieria Industrial,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
@@ -200,43 +208,44 @@
 20811,HANNIA RUBÍ MENDOZA OCHOA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
 20811,HANNIA RUBÍ MENDOZA OCHOA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 210,CRISTINA JOSEFINA ALMAGUER RINCÓN,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
-21131,ERIKA YAMILET MARTINEZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-21131,ERIKA YAMILET MARTINEZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-21131,ERIKA YAMILET MARTINEZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-21131,ERIKA YAMILET MARTINEZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-21131,ERIKA YAMILET MARTINEZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-21131,ERIKA YAMILET MARTINEZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-21444,LUIS CARLOS CASTELLANOS CARRERA,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-21444,LUIS CARLOS CASTELLANOS CARRERA,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-21444,LUIS CARLOS CASTELLANOS CARRERA,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-21444,LUIS CARLOS CASTELLANOS CARRERA,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-21444,LUIS CARLOS CASTELLANOS CARRERA,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-21444,LUIS CARLOS CASTELLANOS CARRERA,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-21479,ALEJANDRO SILVA CASTILLO,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-21479,ALEJANDRO SILVA CASTILLO,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-21479,ALEJANDRO SILVA CASTILLO,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-21479,ALEJANDRO SILVA CASTILLO,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-21479,ALEJANDRO SILVA CASTILLO,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-21479,ALEJANDRO SILVA CASTILLO,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+21131,ERIKA YAMILET MARTINEZ,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+21131,ERIKA YAMILET MARTINEZ,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+21131,ERIKA YAMILET MARTINEZ,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+21131,ERIKA YAMILET MARTINEZ,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+21131,ERIKA YAMILET MARTINEZ,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+21131,ERIKA YAMILET MARTINEZ,Coordinación de Compromiso Social,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+21444,LUIS CARLOS CASTELLANOS CARRERA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+21444,LUIS CARLOS CASTELLANOS CARRERA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+21444,LUIS CARLOS CASTELLANOS CARRERA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+21444,LUIS CARLOS CASTELLANOS CARRERA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+21444,LUIS CARLOS CASTELLANOS CARRERA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+21444,LUIS CARLOS CASTELLANOS CARRERA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+21479,ALEJANDRO SILVA CASTILLO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+21479,ALEJANDRO SILVA CASTILLO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+21479,ALEJANDRO SILVA CASTILLO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+21479,ALEJANDRO SILVA CASTILLO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+21479,ALEJANDRO SILVA CASTILLO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+21479,ALEJANDRO SILVA CASTILLO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 21558,FABIOLA JACQUELINE FLORES RUIZ,Licenciatura en Diseño Gráfico,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 21558,FABIOLA JACQUELINE FLORES RUIZ,Licenciatura en Diseño Gráfico,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 21583,BÁRBARA CONSTANZA ILLOLDI MENDIOLEA,Licenciatura en Médico Cirujano,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
-21711,ANDREA CAVAZOS ALEXANDER,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-21711,ANDREA CAVAZOS ALEXANDER,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-21711,ANDREA CAVAZOS ALEXANDER,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-21711,ANDREA CAVAZOS ALEXANDER,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-21711,ANDREA CAVAZOS ALEXANDER,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-21711,ANDREA CAVAZOS ALEXANDER,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+21583,BÁRBARA CONSTANZA ILLOLDI MENDIOLEA,Licenciatura en Médico Cirujano,Dirección de Ciencias de la Salud,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
+21711,ANDREA CAVAZOS ALEXANDER,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+21711,ANDREA CAVAZOS ALEXANDER,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+21711,ANDREA CAVAZOS ALEXANDER,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+21711,ANDREA CAVAZOS ALEXANDER,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+21711,ANDREA CAVAZOS ALEXANDER,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+21711,ANDREA CAVAZOS ALEXANDER,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 21926,AIDA EILEEN LÓPEZ LOYA,Licenciatura en Finanzas y Contaduría Pública,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
-22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
+22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+22119,CYNTHIA DE LOS ÁNGELES ANDRADE GUZMÁN,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
 22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
+22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
 22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
 22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
@@ -244,6 +253,7 @@
 22259,ANA JESSICA ESQUEDA GONZÁLEZ,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 22268,ISMAEL JAVIER GONZÁLEZ GARMA,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 22268,ISMAEL JAVIER GONZÁLEZ GARMA,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
+22269,JUANITA ANGÉLICA GARCÍA AZAMAR,Licenciatura en Finanzas y Contaduría Pública,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
 22276,JOSÉ LUIS MARTÍNEZ HERNÁNDEZ,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,En línea,01/06/2026
 22276,JOSÉ LUIS MARTÍNEZ HERNÁNDEZ,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 22276,JOSÉ LUIS MARTÍNEZ HERNÁNDEZ,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
@@ -259,12 +269,12 @@
 22864,ANA DANIELA DELIL GUZMÁN GONZÁLEZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
 22864,ANA DANIELA DELIL GUZMÁN GONZÁLEZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
 22864,ANA DANIELA DELIL GUZMÁN GONZÁLEZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-22999,EMMANUEL DEL ÁNGEL PÉREZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-22999,EMMANUEL DEL ÁNGEL PÉREZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-22999,EMMANUEL DEL ÁNGEL PÉREZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-22999,EMMANUEL DEL ÁNGEL PÉREZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-22999,EMMANUEL DEL ÁNGEL PÉREZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-22999,EMMANUEL DEL ÁNGEL PÉREZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+22999,EMMANUEL DEL ÁNGEL PÉREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+22999,EMMANUEL DEL ÁNGEL PÉREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+22999,EMMANUEL DEL ÁNGEL PÉREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+22999,EMMANUEL DEL ÁNGEL PÉREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+22999,EMMANUEL DEL ÁNGEL PÉREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+22999,EMMANUEL DEL ÁNGEL PÉREZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 23201,VICTOR GUILLERMO ASAD ZETINA,Licenciatura en Ingeniería en Sistemas y Negocios Digitales,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 23201,VICTOR GUILLERMO ASAD ZETINA,Licenciatura en Ingeniería en Sistemas y Negocios Digitales,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
 23201,VICTOR GUILLERMO ASAD ZETINA,Licenciatura en Ingeniería en Sistemas y Negocios Digitales,Dirección de Ciencias Exactas,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
@@ -288,6 +298,8 @@
 23584,DORA  LUISA ROUX OROPEZA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 23584,DORA  LUISA ROUX OROPEZA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 23584,DORA  LUISA ROUX OROPEZA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+23660,MARÍA ALEJANDRA AVENDAÑO CORREA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
+23660,MARÍA ALEJANDRA AVENDAÑO CORREA,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,05/06/2026
 23797,LUIS FRANCO SOSA PEREZ,Licenciatura en Finanzas y Contaduría Pública,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 24288,YOLANDA YUNUEN ROCHA PICAZO,Licenciatura en Negocios Internacionales,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 24288,YOLANDA YUNUEN ROCHA PICAZO,Licenciatura en Negocios Internacionales,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
@@ -297,12 +309,12 @@
 24377,SERGIO HERNÁNDEZ CABALLERO,Departamento de Finanzas y Economía,Dirección de Ciencias Económico-Administrativas,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
 24377,SERGIO HERNÁNDEZ CABALLERO,Departamento de Finanzas y Economía,Dirección de Ciencias Económico-Administrativas,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
 24377,SERGIO HERNÁNDEZ CABALLERO,Departamento de Finanzas y Economía,Dirección de Ciencias Económico-Administrativas,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-24412,ANAHY MONSERRAT MOJICA LÓPEZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-24412,ANAHY MONSERRAT MOJICA LÓPEZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-24412,ANAHY MONSERRAT MOJICA LÓPEZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-24412,ANAHY MONSERRAT MOJICA LÓPEZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-24412,ANAHY MONSERRAT MOJICA LÓPEZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-24412,ANAHY MONSERRAT MOJICA LÓPEZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+24412,ANAHY MONSERRAT MOJICA LÓPEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+24412,ANAHY MONSERRAT MOJICA LÓPEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+24412,ANAHY MONSERRAT MOJICA LÓPEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+24412,ANAHY MONSERRAT MOJICA LÓPEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+24412,ANAHY MONSERRAT MOJICA LÓPEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+24412,ANAHY MONSERRAT MOJICA LÓPEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 24460,MARTHA EMILIA LEÓN DIX,Licenciatura en Ingenieria Industrial,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 24460,MARTHA EMILIA LEÓN DIX,Licenciatura en Ingenieria Industrial,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 24512,JORGE ALEJANDRO HERNANDEZ HERNÁNDEZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
@@ -319,41 +331,41 @@
 25838,OSCAR MANUEL CORTÉS SALAZAR,No disponible,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
 25949,DAVID ALBERTO GARCÍA PAZ,Licenciatura en Negocios Internacionales,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
 25966,MAURICIO DANIEL CALDERÓN ZAMORA,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
-26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+26135,JUAN CARLOS MÁRQUEZ MARTÍNEZ,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 26291,AUREDY ARACELY DELGADO HOY,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 26291,AUREDY ARACELY DELGADO HOY,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
 26689,SANDRA ISABEL BAUTISTA CABRERA,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
 26689,SANDRA ISABEL BAUTISTA CABRERA,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,04/06/2026
 2980,RAFAEL GEA DÍAZ,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 2980,RAFAEL GEA DÍAZ,Licenciatura en Ingeniería Mecatrónica,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
-3163,MARIA DOLORES GONZALEZ DE LA FUENTE,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-3163,MARIA DOLORES GONZALEZ DE LA FUENTE,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-3163,MARIA DOLORES GONZALEZ DE LA FUENTE,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-3163,MARIA DOLORES GONZALEZ DE LA FUENTE,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-3163,MARIA DOLORES GONZALEZ DE LA FUENTE,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-3163,MARIA DOLORES GONZALEZ DE LA FUENTE,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+3163,MARIA DOLORES GONZALEZ DE LA FUENTE,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+3163,MARIA DOLORES GONZALEZ DE LA FUENTE,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+3163,MARIA DOLORES GONZALEZ DE LA FUENTE,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+3163,MARIA DOLORES GONZALEZ DE LA FUENTE,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+3163,MARIA DOLORES GONZALEZ DE LA FUENTE,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+3163,MARIA DOLORES GONZALEZ DE LA FUENTE,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 4156,BERTHA EUGENIA LAVÍN RAMOS,Licenciatura en Finanzas y Contaduría Pública,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 4156,BERTHA EUGENIA LAVÍN RAMOS,Licenciatura en Finanzas y Contaduría Pública,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 5030,NANCY MENDEZ MELO,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
 5030,NANCY MENDEZ MELO,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-5030,NANCY MENDEZ MELO,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
-5262,NORMA ARACELY MORALES DEL ÁNGEL,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-5262,NORMA ARACELY MORALES DEL ÁNGEL,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-5262,NORMA ARACELY MORALES DEL ÁNGEL,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-5262,NORMA ARACELY MORALES DEL ÁNGEL,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-5262,NORMA ARACELY MORALES DEL ÁNGEL,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-5262,NORMA ARACELY MORALES DEL ÁNGEL,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-5292,DANIELA MORALES MALDONADO,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-5292,DANIELA MORALES MALDONADO,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-5292,DANIELA MORALES MALDONADO,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-5292,DANIELA MORALES MALDONADO,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-5292,DANIELA MORALES MALDONADO,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-5292,DANIELA MORALES MALDONADO,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+5030,NANCY MENDEZ MELO,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,05/06/2026
+5262,NORMA ARACELY MORALES DEL ÁNGEL,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+5262,NORMA ARACELY MORALES DEL ÁNGEL,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+5262,NORMA ARACELY MORALES DEL ÁNGEL,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+5262,NORMA ARACELY MORALES DEL ÁNGEL,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+5262,NORMA ARACELY MORALES DEL ÁNGEL,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+5262,NORMA ARACELY MORALES DEL ÁNGEL,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+5292,DANIELA MORALES MALDONADO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+5292,DANIELA MORALES MALDONADO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+5292,DANIELA MORALES MALDONADO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+5292,DANIELA MORALES MALDONADO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+5292,DANIELA MORALES MALDONADO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+5292,DANIELA MORALES MALDONADO,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 5469,MANUEL ALEJANDRO NAVA ESTRADA,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 5637,MÓNICA OLVERA RAMÍREZ,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
 6389,ANGÉLICA GUADALUPE RAMOS MARTÍNEZ,Licenciatura en Finanzas y Contaduría Pública,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
@@ -361,11 +373,14 @@
 6519,ELSA RIESTRA GARCÍA,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 6519,ELSA RIESTRA GARCÍA,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
 6763,PATRICIA ELIZABETH RODRÍGUEZ PEÑA,Licenciatura en Psicología,Dirección de Ciencias de la Salud,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
+6895,SERGIO ARTURO ROMO BECERRA,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
+7888,OLGA LIZZETH URBINA LLOVERA,Licenciatura en Mercadotecnia Estratégica e Innovación,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
+7888,OLGA LIZZETH URBINA LLOVERA,Licenciatura en Mercadotecnia Estratégica e Innovación,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,05/06/2026
 7970,SILVIA CONSUELO VALLES GONZÁLEZ,Licenciatura en Mercadotecnia Estratégica e Innovación,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 7970,SILVIA CONSUELO VALLES GONZÁLEZ,Licenciatura en Mercadotecnia Estratégica e Innovación,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 8296,MÓNICA ADRIANA VIOLANTE ZUBIETA,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Económico-Administrativas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 8296,MÓNICA ADRIANA VIOLANTE ZUBIETA,Licenciatura en Dirección y Administración de Empresas,Dirección de Ciencias Económico-Administrativas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,02/06/2026
-8357,ROMÁN ALBERTO ZAMARRIPA FRANCO,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,03/06/2026
+8357,ROMÁN ALBERTO ZAMARRIPA FRANCO,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,05/06/2026
 8357,ROMÁN ALBERTO ZAMARRIPA FRANCO,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 8357,ROMÁN ALBERTO ZAMARRIPA FRANCO,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,03/06/2026
 8357,ROMÁN ALBERTO ZAMARRIPA FRANCO,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
@@ -373,18 +388,19 @@
 8357,ROMÁN ALBERTO ZAMARRIPA FRANCO,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
 8357,ROMÁN ALBERTO ZAMARRIPA FRANCO,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
 8357,ROMÁN ALBERTO ZAMARRIPA FRANCO,Licenciatura en Ingeniería Química,Dirección de Ciencias Exactas,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+8658,GABRIEL BARRIENTOS GOMEZ,Licenciatura en Derecho,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,04/06/2026
 8712,DANIEL BUSTOS MÁRQUEZ,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
 8712,DANIEL BUSTOS MÁRQUEZ,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
 8712,DANIEL BUSTOS MÁRQUEZ,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
 8712,DANIEL BUSTOS MÁRQUEZ,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
 8712,DANIEL BUSTOS MÁRQUEZ,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
 8712,DANIEL BUSTOS MÁRQUEZ,Licenciatura en Idiomas,Dirección de Humanidades,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
-9221,LUIS GERARDO GONZALEZ MAYORGA,No disponible,No disponible,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
-9221,LUIS GERARDO GONZALEZ MAYORGA,No disponible,No disponible,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
-9221,LUIS GERARDO GONZALEZ MAYORGA,No disponible,No disponible,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
-9221,LUIS GERARDO GONZALEZ MAYORGA,No disponible,No disponible,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
-9221,LUIS GERARDO GONZALEZ MAYORGA,No disponible,No disponible,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
-9221,LUIS GERARDO GONZALEZ MAYORGA,No disponible,No disponible,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
+9221,LUIS GERARDO GONZALEZ MAYORGA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 1. INTRODUCCIÓN Y APUNTES.,Presencial,01/06/2026
+9221,LUIS GERARDO GONZALEZ MAYORGA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 2. TAREAS Y SPEEDGRADER.,Presencial,01/06/2026
+9221,LUIS GERARDO GONZALEZ MAYORGA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 3. GRUPOS (EQUIPOS).,Presencial,01/06/2026
+9221,LUIS GERARDO GONZALEZ MAYORGA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 4. RÚBRICAS.,Presencial,01/06/2026
+9221,LUIS GERARDO GONZALEZ MAYORGA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 5. FOROS DE DISCUSIÓN.,Presencial,01/06/2026
+9221,LUIS GERARDO GONZALEZ MAYORGA,Coordinación Académica de Formación Integral,Dirección de Formación Integral e Identidad Católica,CANVAS 6. EXÁMENES Y SPEEDGRADER.,Presencial,01/06/2026
 9288,SERGIO RAMON HERNANDEZ ALVARADO,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026
 9288,SERGIO RAMON HERNANDEZ ALVARADO,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 2. TAREAS Y SPEEDGRADER.,A distancia,02/06/2026
 9290,LAURA HERLINDA HERNÁNDEZ ARRESE,Licenciatura en Arquitectura,Dirección de Humanidades,CANVAS 1. INTRODUCCIÓN Y APUNTES.,A distancia,01/06/2026

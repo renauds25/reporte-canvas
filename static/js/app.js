@@ -875,3 +875,4 @@ progressObserver.observe(document.body, {
 });
 
 window.addEventListener("load", initProgressScrollAnimations);
+
