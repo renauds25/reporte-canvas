@@ -834,27 +834,32 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initProgressScrollAnimations() {
-    const rows = document.querySelectorAll(".progress-row");
+    const rows = document.querySelectorAll(".progress-row:not([data-animation-observed])");
 
     if (!rows.length) return;
 
-    rows.forEach(row => row.classList.remove("in-view"));
+    if (!window.progressScrollObserver) {
+        window.progressScrollObserver = new IntersectionObserver(
+            entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add("in-view");
+                        window.progressScrollObserver.unobserve(entry.target);
+                    }
+                });
+            },
+            {
+                threshold: 0.25,
+                rootMargin: "0px 0px -8% 0px",
+            }
+        );
+    }
 
-    const observer = new IntersectionObserver(
-        entries => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add("in-view");
-                    observer.unobserve(entry.target);
-                }
-            });
-        },
-        {
-            threshold: 0.35,
-        }
-    );
-
-    rows.forEach(row => observer.observe(row));
+    rows.forEach(row => {
+        row.dataset.animationObserved = "true";
+        row.classList.remove("in-view");
+        window.progressScrollObserver.observe(row);
+    });
 }
 
 const progressObserver = new MutationObserver(() => {
