@@ -235,6 +235,10 @@ function renderCursoResumen() {
             `;
         })
         .join("");
+
+    if (typeof initProgressScrollAnimations === "function") {
+        requestAnimationFrame(initProgressScrollAnimations);
+    }
 }
 
 function renderDivisionTabs() {
@@ -828,3 +832,46 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
+
+function initProgressScrollAnimations() {
+    const rows = document.querySelectorAll(".progress-row");
+
+    if (!rows.length) return;
+
+    rows.forEach(row => row.classList.remove("in-view"));
+
+    const observer = new IntersectionObserver(
+        entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("in-view");
+                    observer.unobserve(entry.target);
+                }
+            });
+        },
+        {
+            threshold: 0.35,
+        }
+    );
+
+    rows.forEach(row => observer.observe(row));
+}
+
+const progressObserver = new MutationObserver(() => {
+    const rows = document.querySelectorAll(".progress-row:not([data-animation-ready])");
+
+    if (!rows.length) return;
+
+    rows.forEach(row => {
+        row.dataset.animationReady = "true";
+    });
+
+    initProgressScrollAnimations();
+});
+
+progressObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+});
+
+window.addEventListener("load", initProgressScrollAnimations);

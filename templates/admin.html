@@ -32,62 +32,36 @@
                 </form>
             </section>
         {% else %}
-            <section class="section panel">
-                <h2>1. Subir base maestra de usuarios</h2>
-                <p>Este archivo ayuda a completar nombres, correos e IDs cuando el CSV de capacitaciones venga incompleto.</p>
-                <pre class="code">id,nombre,correo,carrera,division</pre>
-
-                <form method="post" action="/admin/upload/usuarios" enctype="multipart/form-data" class="form">
-                    <label for="usuarios">Archivo CSV de usuarios</label>
-                    <input id="usuarios" name="archivo" type="file" accept=".csv" required>
-                    <button class="btn" type="submit">Actualizar usuarios</button>
-                </form>
-            </section>
-
-            <section class="section panel">
-                <h2>2. Subir CSV de capacitaciones</h2>
-                <p>Puede traer nombre incompleto o correo vacío, siempre que tenga ID o algún dato que coincida con la base maestra.</p>
-                <pre class="code">id,nombre,carrera,division,curso,modalidad,fecha_actualizacion</pre>
-                <p class="muted">La columna <code>correo</code> se recomienda, pero el sistema también acepta el formato anterior sin correo.</p>
-
-                <form method="post" action="/admin/upload/capacitaciones" enctype="multipart/form-data" class="form">
-                    <label for="capacitaciones">Archivo CSV de capacitaciones</label>
-                    <input id="capacitaciones" name="archivo" type="file" accept=".csv" required>
-                    <button class="btn" type="submit">Actualizar capacitaciones</button>
-                </form>
-            </section>
-
-            <section class="section panel">
+            <section class="section panel admin-status-panel">
                 <h2>Estado actual</h2>
                 <div class="cards mini">
                     <article class="card">
                         <span>Usuarios esperados</span>
-                        <strong>{{ reporte.total_personas }}</strong>
+                        <strong id="adminTotalPersonas">{{ reporte.total_personas }}</strong>
                     </article>
                     <article class="card">
                         <span>Con avance</span>
-                        <strong>{{ reporte.personas_con_avance }}</strong>
+                        <strong id="adminPersonasConAvance">{{ reporte.personas_con_avance }}</strong>
                     </article>
                     <article class="card">
                         <span>Registros</span>
-                        <strong>{{ reporte.total_registros }}</strong>
+                        <strong id="adminTotalRegistros">{{ reporte.total_registros }}</strong>
                     </article>
                     <article class="card success">
                         <span>Completos</span>
-                        <strong>{{ reporte.personas_completas }}</strong>
+                        <strong id="adminPersonasCompletas">{{ reporte.personas_completas }}</strong>
                     </article>
                     <article class="card warning">
                         <span>Pendientes</span>
-                        <strong>{{ reporte.personas_pendientes }}</strong>
+                        <strong id="adminPersonasPendientes">{{ reporte.personas_pendientes }}</strong>
                     </article>
                     <article class="card warning">
                         <span>Sin iniciar</span>
-                        <strong>{{ reporte.usuarios_sin_iniciar }}</strong>
+                        <strong id="adminUsuariosSinIniciar">{{ reporte.usuarios_sin_iniciar }}</strong>
                     </article>
                 </div>
-                <p class="muted">Registros sin coincidencia en base maestra: {{ reporte.total_registros_sin_coincidencia }}</p>
+                <p class="muted">Registros sin coincidencia en base maestra: <span id="adminTotalSinCoincidencia">{{ reporte.total_registros_sin_coincidencia }}</span></p>
             </section>
-
 
             <section class="section panel admin-metrics-panel">
                 <h2>Avance cursos CANVAS 1 y CANVAS 2</h2>
@@ -97,19 +71,19 @@
                 {% set porcentaje_canvas_1_2 = (avance_canvas_1_2 / total_canvas_1_2 * 100) if total_canvas_1_2 else 0 %}
                 <div class="admin-dashboard-grid">
                     <div class="pie-layout admin-pie-layout">
-                        <div class="pie-chart" style="--pie-value: {{ porcentaje_canvas_1_2 * 3.6 }}deg" data-percent="{{ '%.1f'|format(porcentaje_canvas_1_2) }}%" aria-label="Avance cursos CANVAS 1 y CANVAS 2"></div>
+                        <div id="adminPieChart" class="pie-chart" style="--pie-value: {{ porcentaje_canvas_1_2 * 3.6 }}deg" data-percent="{{ '%.1f'|format(porcentaje_canvas_1_2) }}%" aria-label="Avance cursos CANVAS 1 y CANVAS 2"></div>
                         <div class="pie-legend">
                             <div class="legend-item success">
                                 <span class="legend-dot"></span>
                                 <div>
-                                    <strong>{{ avance_canvas_1_2 }}</strong>
+                                    <strong id="adminPieCompletados">{{ avance_canvas_1_2 }}</strong>
                                     <small>Maestros que completaron ambos cursos</small>
                                 </div>
                             </div>
                             <div class="legend-item pending">
                                 <span class="legend-dot"></span>
                                 <div>
-                                    <strong>{{ pendientes_canvas_1_2 }}</strong>
+                                    <strong id="adminPiePendientes">{{ pendientes_canvas_1_2 }}</strong>
                                     <small>Maestros pendientes por completarlos</small>
                                 </div>
                             </div>
@@ -117,7 +91,7 @@
                     </div>
                     <div class="admin-modalidad-card">
                         <h3>Conteo por modalidad</h3>
-                        <div class="summary-list">
+                        <div id="adminModalidadList" class="summary-list">
                             {% for modalidad, total in reporte.conteo_por_modalidad.items() %}
                                 <div class="summary-row">
                                     <span>{{ modalidad }}</span>
@@ -132,9 +106,9 @@
             <section class="section panel">
                 <h2>Control de calidad de datos</h2>
                 {% if reporte.usa_base_maestra %}
-                    <p class="warning-text">{{ reporte.total_registros_sin_coincidencia }} registro(s) de capacitación no coinciden con la base maestra.</p>
-                    <p class="warning-text">{{ reporte.usuarios_sin_iniciar }} usuario(s) de la base maestra todavía no tienen cursos registrados.</p>
-                    <div class="actions">
+                    <p class="warning-text"><span id="adminQualitySinCoincidencia">{{ reporte.total_registros_sin_coincidencia }}</span> registro(s) de capacitación no coinciden con la base maestra.</p>
+                    <p class="warning-text"><span id="adminQualitySinIniciar">{{ reporte.usuarios_sin_iniciar }}</span> usuario(s) de la base maestra todavía no tienen cursos registrados.</p>
+                    <div id="adminQualityActions" class="actions">
                         <a class="btn secondary" href="/admin/download/sin-coincidencia">Descargar no coinciden</a>
                         <a class="btn secondary" href="/admin/download/sin-iniciar">Descargar sin iniciar</a>
                     </div>
@@ -143,10 +117,189 @@
                 {% endif %}
             </section>
 
+            <section class="section panel">
+                <h2>1. Subir base maestra de usuarios</h2>
+                <p>Este archivo ayuda a completar nombres, correos e IDs cuando el CSV de capacitaciones venga incompleto.</p>
+                <pre class="code">id,nombre,correo,carrera,division</pre>
+
+                <form method="post" action="/admin/upload/usuarios" enctype="multipart/form-data" class="form admin-upload-form" data-upload-type="usuarios">
+                    <label for="usuarios">Archivo CSV de usuarios</label>
+                    <input id="usuarios" name="archivo" type="file" accept=".csv" required>
+                    <button class="btn" type="submit">Actualizar usuarios</button>
+                </form>
+            </section>
+
+            <section class="section panel">
+                <h2>2. Subir CSV de capacitaciones</h2>
+                <p>Puede traer nombre incompleto o correo vacío, siempre que tenga ID o algún dato que coincida con la base maestra.</p>
+                <pre class="code">id,nombre,carrera,division,curso,modalidad,fecha_actualizacion</pre>
+                <p class="muted">La columna <code>correo</code> se recomienda, pero el sistema también acepta el formato anterior sin correo.</p>
+
+                <form method="post" action="/admin/upload/capacitaciones" enctype="multipart/form-data" class="form admin-upload-form" data-upload-type="capacitaciones">
+                    <label for="capacitaciones">Archivo CSV de capacitaciones</label>
+                    <input id="capacitaciones" name="archivo" type="file" accept=".csv" required>
+                    <button class="btn" type="submit">Actualizar capacitaciones</button>
+                </form>
+            </section>
+
             <form method="post" action="/admin/logout">
                 <button class="btn secondary" type="submit">Cerrar sesión</button>
             </form>
         {% endif %}
     </main>
+
+    {% if logged_in %}
+    <script>
+        const adminFormatNumber = (value) => new Intl.NumberFormat("es-MX").format(Number(value || 0));
+
+        function setAdminText(selector, value) {
+            const element = document.querySelector(selector);
+            if (element) element.textContent = adminFormatNumber(value);
+        }
+
+        function launchAdminConfetti() {
+            const colors = ["#ff5900", "#ff9d00", "#172033", "#1f8f5f", "#ffd8c4"];
+            const total = 90;
+
+            for (let i = 0; i < total; i += 1) {
+                const piece = document.createElement("span");
+                piece.className = "confetti-piece";
+                piece.style.left = `${Math.random() * 100}vw`;
+                piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+                piece.style.setProperty("--fall-duration", `${2.2 + Math.random() * 1.8}s`);
+                piece.style.setProperty("--fall-drift", `${(Math.random() - 0.5) * 220}px`);
+                piece.style.setProperty("--fall-rotation", `${360 + Math.random() * 720}deg`);
+                piece.style.animationDelay = `${Math.random() * 0.35}s`;
+                document.body.appendChild(piece);
+                piece.addEventListener("animationend", () => piece.remove());
+            }
+        }
+
+        function showAdminUpdateToast(type, isError = false) {
+            const labels = {
+                usuarios: "Base maestra actualizada",
+                capacitaciones: "Capacitaciones actualizadas",
+                error: "No se pudo actualizar",
+            };
+            const toast = document.createElement("div");
+            toast.className = `admin-update-toast${isError ? " error" : ""}`;
+            toast.textContent = isError ? `⚠️ ${type}` : `🎉 ${labels[type] || "Reporte actualizado"} correctamente`;
+            document.body.appendChild(toast);
+            toast.addEventListener("animationend", () => toast.remove());
+        }
+
+        function renderAdminModalidades(reporte) {
+            const container = document.querySelector("#adminModalidadList");
+            if (!container) return;
+
+            const modalidades = reporte.modalidades || Object.keys(reporte.conteo_por_modalidad || {});
+            container.innerHTML = modalidades
+                .map((modalidad) => `
+                    <div class="summary-row">
+                        <span>${modalidad}</span>
+                        <strong>${adminFormatNumber((reporte.conteo_por_modalidad || {})[modalidad] || 0)}</strong>
+                    </div>
+                `)
+                .join("");
+        }
+
+        function updateAdminDashboard(reporte) {
+            setAdminText("#adminTotalPersonas", reporte.total_personas);
+            setAdminText("#adminPersonasConAvance", reporte.personas_con_avance);
+            setAdminText("#adminTotalRegistros", reporte.total_registros);
+            setAdminText("#adminPersonasCompletas", reporte.personas_completas);
+            setAdminText("#adminPersonasPendientes", reporte.personas_pendientes);
+            setAdminText("#adminUsuariosSinIniciar", reporte.usuarios_sin_iniciar);
+            setAdminText("#adminTotalSinCoincidencia", reporte.total_registros_sin_coincidencia);
+            setAdminText("#adminQualitySinCoincidencia", reporte.total_registros_sin_coincidencia);
+            setAdminText("#adminQualitySinIniciar", reporte.usuarios_sin_iniciar);
+
+            const totalCanvas12 = reporte.total_usuarios_esperados || reporte.total_personas || 0;
+            const completadosCanvas12 = reporte.personas_con_cursos_1_y_2 || 0;
+            const pendientesCanvas12 = Math.max(0, totalCanvas12 - completadosCanvas12);
+            const porcentajeCanvas12 = totalCanvas12 ? (completadosCanvas12 / totalCanvas12) * 100 : 0;
+
+            const pie = document.querySelector("#adminPieChart");
+            if (pie) {
+                pie.style.setProperty("--pie-value", `${porcentajeCanvas12 * 3.6}deg`);
+                pie.dataset.percent = `${porcentajeCanvas12.toFixed(1)}%`;
+            }
+
+            setAdminText("#adminPieCompletados", completadosCanvas12);
+            setAdminText("#adminPiePendientes", pendientesCanvas12);
+            renderAdminModalidades(reporte);
+        }
+
+        async function handleAdminUpload(form) {
+            const button = form.querySelector("button[type='submit']");
+            const input = form.querySelector("input[type='file']");
+            const originalText = button ? button.textContent : "";
+            const uploadType = form.dataset.uploadType || "reporte";
+
+            if (!input || !input.files.length) {
+                showAdminUpdateToast("Selecciona un archivo CSV.", true);
+                return;
+            }
+
+            try {
+                if (button) {
+                    button.classList.add("is-loading");
+                    button.disabled = true;
+                    button.textContent = "Actualizando...";
+                }
+
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: {
+                        "X-Requested-With": "fetch",
+                        "Accept": "application/json",
+                    },
+                });
+
+                const payload = await response.json();
+
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || "Ocurrió un error al actualizar.");
+                }
+
+                if (payload.reporte) {
+                    updateAdminDashboard(payload.reporte);
+                }
+
+                input.value = "";
+                showAdminUpdateToast(uploadType);
+                launchAdminConfetti();
+            } catch (error) {
+                showAdminUpdateToast(error.message || "No se pudo actualizar.", true);
+            } finally {
+                if (button) {
+                    button.classList.remove("is-loading");
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            }
+        }
+
+        document.querySelectorAll(".admin-upload-form").forEach(form => {
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                handleAdminUpload(form);
+            });
+        });
+
+        const adminParams = new URLSearchParams(window.location.search);
+        const updated = adminParams.get("updated");
+
+        if (updated) {
+            showAdminUpdateToast(updated);
+            launchAdminConfetti();
+
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+        }
+    </script>
+    {% endif %}
+
 </body>
 </html>

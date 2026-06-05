@@ -496,17 +496,31 @@ def save_uploaded_csv(field_name: str, destination: Path, required_headers: set[
     return None
 
 
+def wants_json_response() -> bool:
+    return request.headers.get("X-Requested-With") == "fetch" or "application/json" in request.headers.get("Accept", "")
+
+
+def admin_report_payload() -> dict[str, Any]:
+    return build_report(read_capacitaciones(), read_users())
+
+
 @app.post("/admin/upload/capacitaciones")
 @report_login_required
 @login_required
 def upload_capacitaciones():
     required = {"id", "nombre", "carrera", "division", "curso", "modalidad", "fecha_actualizacion"}
     error = save_uploaded_csv("archivo", CAPACITACIONES_PATH, required)
+
+    if wants_json_response():
+        if error:
+            return jsonify({"ok": False, "error": error}), 400
+        return jsonify({"ok": True, "updated": "capacitaciones", "reporte": admin_report_payload()})
+
     if error:
         rows = read_capacitaciones()
         users = read_users()
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
-    return redirect(url_for("admin_panel"))
+    return redirect(url_for("admin_panel", updated="capacitaciones"))
 
 
 @app.post("/admin/upload/usuarios")
@@ -515,11 +529,17 @@ def upload_capacitaciones():
 def upload_usuarios():
     required = {"id", "nombre", "correo"}
     error = save_uploaded_csv("archivo", USUARIOS_PATH, required)
+
+    if wants_json_response():
+        if error:
+            return jsonify({"ok": False, "error": error}), 400
+        return jsonify({"ok": True, "updated": "usuarios", "reporte": admin_report_payload()})
+
     if error:
         rows = read_capacitaciones()
         users = read_users()
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
-    return redirect(url_for("admin_panel"))
+    return redirect(url_for("admin_panel", updated="usuarios"))
 
 
 def make_csv_response(filename: str, rows: list[dict[str, Any]], headers: list[str]) -> Response:
