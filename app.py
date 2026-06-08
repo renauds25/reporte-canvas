@@ -305,10 +305,7 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
                 por_modalidad[modalidad][curso] = []
             por_modalidad[modalidad][curso].append(resolved)
 
-        # Este conteo se usa en el panel admin junto a la gráfica de CANVAS 1 y 2,
-        # por eso solo debe considerar esos dos cursos y no todos los registros.
-        if norm(curso) in {norm(c) for c in CURSOS_OFICIALES[:2]}:
-            conteo_por_modalidad[modalidad] = conteo_por_modalidad.get(modalidad, 0) + 1
+        conteo_por_modalidad[modalidad] = conteo_por_modalidad.get(modalidad, 0) + 1
 
         curso_key = norm(curso)
         if curso_key:
