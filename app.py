@@ -579,6 +579,32 @@ def download_sin_iniciar():
     return make_csv_response("usuarios_sin_iniciar.csv", reporte["usuarios_sin_iniciar_lista"], headers)
 
 
+@app.get("/admin/download/completos")
+@report_login_required
+@login_required
+def download_maestros_completos():
+    reporte = build_report(read_capacitaciones(), read_users())
+    maestros_completos = []
+
+    for persona in reporte["personas"]:
+        if not persona.get("completo"):
+            continue
+
+        maestros_completos.append({
+            "id": persona.get("id", ""),
+            "nombre": persona.get("nombre", ""),
+            "correo": persona.get("correo", ""),
+            "carrera": persona.get("carrera", ""),
+            "division": persona.get("division", ""),
+            "cursos_completados": persona.get("total_cursos", 0),
+        })
+
+    maestros_completos.sort(key=lambda item: norm(item.get("nombre", "")))
+
+    headers = ["id", "nombre", "correo", "carrera", "division", "cursos_completados"]
+    return make_csv_response("maestros_6_cursos_completos.csv", maestros_completos, headers)
+
+
 @app.post("/admin/logout")
 def logout():
     session.clear()

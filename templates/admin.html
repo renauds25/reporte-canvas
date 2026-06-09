@@ -104,6 +104,13 @@
             </section>
 
             <section class="section panel">
+                <h2>Lista de maestros que ya completaron los 6 cursos</h2>
+                <div class="actions">
+                    <a class="btn secondary" href="/admin/download/completos">Descargar maestros con 6 cursos completos</a>
+                </div>
+            </section>
+
+            <section class="section panel">
                 <h2>Control de calidad de datos</h2>
                 {% if reporte.usa_base_maestra %}
                     <p class="warning-text"><span id="adminQualitySinCoincidencia">{{ reporte.total_registros_sin_coincidencia }}</span> registro(s) de capacitación no coinciden con la base maestra.</p>
@@ -118,9 +125,7 @@
             </section>
 
             <section class="section panel">
-                <h2>1. Subir base maestra de usuarios</h2>
-                <p>Este archivo ayuda a completar nombres, correos e IDs cuando el CSV de capacitaciones venga incompleto.</p>
-                <pre class="code">id,nombre,correo,carrera,division</pre>
+                <h2>1. Base maestra de usuarios</h2>
 
                 <form method="post" action="/admin/upload/usuarios" enctype="multipart/form-data" class="form admin-upload-form" data-upload-type="usuarios">
                     <label for="usuarios">Archivo CSV de usuarios</label>
@@ -130,10 +135,7 @@
             </section>
 
             <section class="section panel">
-                <h2>2. Subir CSV de capacitaciones</h2>
-                <p>Puede traer nombre incompleto o correo vacío, siempre que tenga ID o algún dato que coincida con la base maestra.</p>
-                <pre class="code">id,nombre,carrera,division,curso,modalidad,fecha_actualizacion</pre>
-                <p class="muted">La columna <code>correo</code> se recomienda, pero el sistema también acepta el formato anterior sin correo.</p>
+                <h2>2. CSV de capacitaciones</h2>
 
                 <form method="post" action="/admin/upload/capacitaciones" enctype="multipart/form-data" class="form admin-upload-form" data-upload-type="capacitaciones">
                     <label for="capacitaciones">Archivo CSV de capacitaciones</label>
