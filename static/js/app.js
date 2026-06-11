@@ -217,7 +217,7 @@ function renderCursoResumen() {
             const total = reporte.conteo_por_curso[curso] || 0;
             const porcentaje = totalEsperado > 0 ? (Number(total || 0) / totalEsperado) * 100 : 0;
             const detalle = detalleAvanceCurso(total);
-            const porcentajeTexto = `${porcentaje.toFixed(1)}%`;
+            const porcentajeTexto = `${porcentaje.toFixed(0)}%`;
             const progreso = Math.max(0, Math.min(porcentaje, 100));
             return `
                 <div class="summary-row summary-row-metric progress-row">
