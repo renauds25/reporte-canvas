@@ -534,29 +534,10 @@ function getFilasTodos() {
 }
 
 function getFilasExportacionCurso(cursoKey) {
-    const definition = getCourseDefinition(cursoKey);
-    const cursosPermitidos = new Set(definition.cursos.map((curso) => normalize(curso)));
-    const registros = reporte.registros_detalle || [];
-
-    if (!registros.length) {
-        return getFilasCurso(cursoKey).filter((fila) => fila.completado);
-    }
-
-    const filas = registros
-        .filter((registro) => cursosPermitidos.has(normalize(registro.curso)))
-        .map((registro) => ({
-            curso: registro.curso || "",
-            id: registro.id || "-",
-            nombre: registro.nombre || "Sin nombre",
-            carrera: getCarreraValue(registro.carrera),
-            division: registro.division || "No disponible",
-            actualizacion: formatFecha(registro.fecha_actualizacion || ""),
-            modalidad: registro.modalidad || "",
-            completado: true,
-            fecha_orden: parseFechaOrden(registro.fecha_actualizacion || ""),
-        }));
-
-    return ordenarFilas(aplicarFiltrosAcademicos(filas));
+    // La exportación debe respetar los filtros activos y mostrar la lista completa:
+    // completados y pendientes. Por eso usamos las mismas filas que se muestran
+    // en el módulo de Listas de asistencia, no solo los registros completados.
+    return getFilasCurso(cursoKey);
 }
 
 function exportarTablaCurso(cursoKey) {
