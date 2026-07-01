@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import re
 import os
 import unicodedata
 from collections import defaultdict
@@ -26,6 +27,9 @@ USUARIOS_PATH = DATA_DIR / "usuarios.csv"
 ALUMNOS_DATA_DIR = DATA_DIR / "alumnos"
 ALUMNOS_CAPACITACIONES_PATH = ALUMNOS_DATA_DIR / "capacitaciones.csv"
 ALUMNOS_USUARIOS_PATH = ALUMNOS_DATA_DIR / "usuarios.csv"
+ALUMNOS_PENDIENTES_PATH = ALUMNOS_DATA_DIR / "pendientes_revision.csv"
+ALUMNOS_DESCARTADOS_PATH = ALUMNOS_DATA_DIR / "descartados_menos_30_min.csv"
+ALUMNOS_INSUMOS_DIR = ALUMNOS_DATA_DIR / "insumos_meet"
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
@@ -58,6 +62,7 @@ MODALIDADES = MODALIDADES_OFICIALES
 ALUMNOS_CURSO_OFICIAL = os.getenv("ALUMNOS_CURSO_OFICIAL", "CURSO DE ALUMNOS")
 ALUMNOS_CURSOS_OFICIALES = [ALUMNOS_CURSO_OFICIAL]
 ALUMNOS_MODALIDADES = ["A distancia"]
+ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "30"))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
@@ -95,8 +100,25 @@ def template_context() -> dict[str, Any]:
     }
 
 
+def repair_mojibake(value: Any) -> str:
+    text = str(value or "")
+
+    if not any(marker in text for marker in ("Ã", "Â", "â")):
+        return text
+
+    for encoding in ("cp1252", "latin1"):
+        try:
+            repaired = text.encode(encoding).decode("utf-8")
+            if repaired and repaired != text:
+                return repaired
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+
+    return text
+
+
 def clean(value: Any) -> str:
-    text = str(value or "").strip()
+    text = repair_mojibake(value).strip()
     if text.lower() in {"null", "none", "nan", "n/a", "na", "sin dato", "sin datos"}:
         return ""
     return text
@@ -147,7 +169,7 @@ def normalize_user_row(row: dict[str, str]) -> dict[str, str]:
     return {
         "id": get_value(row, "id", "ID", "matricula", "matrícula", "numero", "número"),
         "nombre": get_value(row, "nombre", "Nombre", "name", "participante"),
-        "correo": get_value(row, "correo", "Correo", "email", "mail", "e-mail"),
+        "correo": get_value(row, "correo", "Correo", "correo electronico", "correo electrónico", "Correo electrónico", "email", "mail", "e-mail"),
         "carrera": get_value(row, "carrera", "Carrera", "licenciatura", "Licenciatura", "programa", "Programa"),
         "division": get_value(row, "division", "División", "Division", "dirección", "Direccion", "area", "Área"),
     }
@@ -157,12 +179,212 @@ def normalize_training_row(row: dict[str, str]) -> dict[str, str]:
     return {
         "id": get_value(row, "id", "ID", "matricula", "matrícula", "numero", "número"),
         "nombre": get_value(row, "nombre", "Nombre", "name", "participante"),
-        "correo": get_value(row, "correo", "Correo", "email", "mail", "e-mail"),
+        "correo": get_value(row, "correo", "Correo", "correo electronico", "correo electrónico", "Correo electrónico", "email", "mail", "e-mail"),
         "carrera": get_value(row, "carrera", "Carrera", "licenciatura", "Licenciatura", "programa", "Programa"),
         "division": get_value(row, "division", "División", "Division", "dirección", "Direccion", "area", "Área"),
         "curso": get_value(row, "curso", "Curso"),
         "modalidad": get_value(row, "modalidad", "Modalidad"),
         "fecha_actualizacion": get_value(row, "fecha_actualizacion", "Fecha_actualizacion", "fecha", "Fecha", "actualizacion", "actualización"),
+    }
+
+
+def normalize_meet_row(row: dict[str, str]) -> dict[str, str]:
+    nombre = get_value(row, "nombre", "Nombre", "name", "first name", "primer nombre")
+    apellido = get_value(row, "apellido", "Apellido", "apellidos", "Apellidos", "last name")
+    nombre_completo = " ".join(part for part in [nombre, apellido] if part).strip()
+
+    return {
+        "nombre": nombre_completo or get_value(row, "nombre completo", "Nombre completo", "participante", "usuario"),
+        "correo": get_value(
+            row,
+            "correo electronico", "Correo electronico", "correo electrónico", "Correo electrónico",
+            "email", "mail", "correo", "Correo",
+        ),
+        "duracion": get_value(
+            row,
+            "duracion", "Duración", "duracion total", "Duración total",
+            "duracion total minutos", "Duración total minutos", "duration", "duration minutes",
+        ),
+        "fecha_actualizacion": get_value(row, "fecha_actualizacion", "fecha", "Fecha", "date"),
+    }
+
+
+def parse_duration_minutes(value: Any) -> float | None:
+    text = clean(value).lower().replace(",", ".")
+
+    if not text:
+        return None
+
+    if ":" in text:
+        parts = [part.strip() for part in text.split(":")]
+        try:
+            numbers = [float(part) for part in parts]
+        except ValueError:
+            return None
+
+        if len(numbers) == 3:
+            hours, minutes, seconds = numbers
+            return hours * 60 + minutes + seconds / 60
+
+        if len(numbers) == 2:
+            minutes, seconds = numbers
+            return minutes + seconds / 60
+
+    hours = 0.0
+    minutes = 0.0
+    seconds = 0.0
+
+    hour_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hora|horas)\b", text)
+    minute_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:m|min|mins|minuto|minutos)\b", text)
+    second_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:s|seg|segs|segundo|segundos)\b", text)
+
+    if hour_match:
+        hours = float(hour_match.group(1))
+
+    if minute_match:
+        minutes = float(minute_match.group(1))
+
+    if second_match:
+        seconds = float(second_match.group(1))
+
+    if hour_match or minute_match or second_match:
+        return hours * 60 + minutes + seconds / 60
+
+    number_match = re.search(r"\d+(?:\.\d+)?", text)
+    if number_match:
+        return float(number_match.group(0))
+
+    return None
+
+
+def format_date_label(value: Any = "") -> str:
+    value = clean(value)
+
+    if not value:
+        return datetime.now().strftime("%d/%m/%Y")
+
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(value, fmt).strftime("%d/%m/%Y")
+        except ValueError:
+            continue
+
+    return value
+
+
+def write_csv(path: Path, rows: list[dict[str, Any]], headers: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=headers)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({header: row.get(header, "") for header in headers})
+
+
+def deduplicate_training_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    deduped: dict[tuple[str, str, str, str], dict[str, str]] = {}
+
+    for row in rows:
+        persona_key = row.get("id") or normalize_email(row.get("correo")) or norm(row.get("nombre"))
+        key = (persona_key, norm(row.get("curso")), norm(row.get("modalidad")), normalize_email(row.get("correo")))
+        previous = deduped.get(key)
+
+        if not previous or parse_date(row.get("fecha_actualizacion", "")) >= parse_date(previous.get("fecha_actualizacion", "")):
+            deduped[key] = row
+
+    return sorted(deduped.values(), key=lambda item: parse_date(item.get("fecha_actualizacion", "")), reverse=True)
+
+
+def process_meet_csv(
+    source_path: Path,
+    curso: str,
+    fecha_actualizacion: str = "",
+) -> dict[str, Any]:
+    users = read_users(ALUMNOS_USUARIOS_PATH)
+    _, by_email, _ = build_user_indexes(users)
+
+    existing_rows = read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH)
+    nuevos: list[dict[str, str]] = []
+    pendientes: list[dict[str, Any]] = []
+    descartados: list[dict[str, Any]] = []
+
+    fecha_default = format_date_label(fecha_actualizacion)
+
+    with source_path.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+
+        for raw_row in reader:
+            meet_row = normalize_meet_row(raw_row)
+            nombre = clean(meet_row.get("nombre", "")).upper()
+            correo = normalize_email(meet_row.get("correo", ""))
+            duracion_texto = meet_row.get("duracion", "")
+            minutos = parse_duration_minutes(duracion_texto)
+            fecha = format_date_label(meet_row.get("fecha_actualizacion") or fecha_default)
+
+            base_record = by_email.get(correo) if correo else None
+
+            registro_base = {
+                "id": base_record.get("id", "") if base_record else "",
+                "nombre": base_record.get("nombre", "") if base_record else nombre,
+                "correo": base_record.get("correo", "") if base_record else correo,
+                "curso": curso,
+                "modalidad": "A distancia",
+                "fecha_actualizacion": fecha,
+                "duracion": duracion_texto,
+                "minutos_num": "" if minutos is None else round(minutos, 2),
+            }
+
+            if not correo:
+                pendientes.append({**registro_base, "motivo": "sin_correo"})
+                continue
+
+            if not base_record:
+                pendientes.append({**registro_base, "motivo": "correo_no_en_base_alumnos"})
+                continue
+
+            if minutos is None:
+                pendientes.append({**registro_base, "motivo": "duracion_no_valida"})
+                continue
+
+            if minutos < ALUMNOS_MINUTOS_MINIMOS:
+                descartados.append({**registro_base, "motivo": f"menos_de_{ALUMNOS_MINUTOS_MINIMOS}_minutos"})
+                continue
+
+            nuevos.append({
+                "id": base_record.get("id", ""),
+                "nombre": base_record.get("nombre", "") or nombre,
+                "correo": base_record.get("correo", "") or correo,
+                "curso": curso,
+                "modalidad": "A distancia",
+                "fecha_actualizacion": fecha,
+            })
+
+    all_rows = deduplicate_training_rows(existing_rows + nuevos)
+
+    write_csv(
+        ALUMNOS_CAPACITACIONES_PATH,
+        all_rows,
+        ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion"],
+    )
+
+    write_csv(
+        ALUMNOS_PENDIENTES_PATH,
+        pendientes,
+        ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "duracion", "minutos_num", "motivo"],
+    )
+
+    write_csv(
+        ALUMNOS_DESCARTADOS_PATH,
+        descartados,
+        ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "duracion", "minutos_num", "motivo"],
+    )
+
+    return {
+        "procesados": len(nuevos) + len(pendientes) + len(descartados),
+        "validos": len(nuevos),
+        "pendientes": len(pendientes),
+        "descartados": len(descartados),
+        "total_capacitaciones": len(all_rows),
     }
 
 
@@ -596,6 +818,95 @@ def upload_usuarios():
     return redirect(url_for("admin_panel", updated="usuarios"))
 
 
+@app.post("/admin/upload/alumnos/usuarios")
+@report_login_required
+@login_required
+def upload_alumnos_usuarios():
+    required = {"id", "nombre", "correo"}
+    error = save_uploaded_csv("archivo", ALUMNOS_USUARIOS_PATH, required)
+
+    if wants_json_response():
+        if error:
+            return jsonify({"ok": False, "error": error}), 400
+        reporte_alumnos = build_report(
+            read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
+            read_users(ALUMNOS_USUARIOS_PATH),
+            cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
+            modalidades=ALUMNOS_MODALIDADES,
+            cursos_requeridos=1,
+            ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
+        )
+        return jsonify({"ok": True, "updated": "alumnos_usuarios", "reporte_alumnos": reporte_alumnos})
+
+    if error:
+        rows = read_capacitaciones()
+        users = read_users()
+        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
+    return redirect(url_for("admin_panel", updated="alumnos_usuarios"))
+
+
+@app.post("/admin/upload/alumnos/meet")
+@report_login_required
+@login_required
+def upload_alumnos_meet():
+    if "archivo" not in request.files:
+        error = "No se recibió ningún archivo."
+        if wants_json_response():
+            return jsonify({"ok": False, "error": error}), 400
+        return redirect(url_for("admin_panel"))
+
+    archivo = request.files["archivo"]
+    if not archivo.filename:
+        error = "Selecciona un archivo CSV de Meet."
+        if wants_json_response():
+            return jsonify({"ok": False, "error": error}), 400
+        return redirect(url_for("admin_panel"))
+
+    if not allowed_file(archivo.filename):
+        error = "Solo se permiten archivos .csv."
+        if wants_json_response():
+            return jsonify({"ok": False, "error": error}), 400
+        return redirect(url_for("admin_panel"))
+
+    ALUMNOS_INSUMOS_DIR.mkdir(parents=True, exist_ok=True)
+    filename = secure_filename(archivo.filename)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    saved_path = ALUMNOS_INSUMOS_DIR / f"{timestamp}_{filename}"
+    archivo.save(saved_path)
+
+    curso = clean(request.form.get("curso")) or ALUMNOS_CURSO_OFICIAL
+    fecha_actualizacion = clean(request.form.get("fecha_actualizacion"))
+
+    try:
+        resultado = process_meet_csv(saved_path, curso=curso, fecha_actualizacion=fecha_actualizacion)
+    except UnicodeDecodeError:
+        error = "El CSV debe estar guardado en UTF-8."
+        if wants_json_response():
+            return jsonify({"ok": False, "error": error}), 400
+        rows = read_capacitaciones()
+        users = read_users()
+        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
+
+    reporte_alumnos = build_report(
+        read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
+        read_users(ALUMNOS_USUARIOS_PATH),
+        cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
+        modalidades=ALUMNOS_MODALIDADES,
+        cursos_requeridos=1,
+        ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
+    )
+
+    if wants_json_response():
+        return jsonify({
+            "ok": True,
+            "updated": "alumnos_meet",
+            "resultado": resultado,
+            "reporte_alumnos": reporte_alumnos,
+        })
+
+    return redirect(url_for("admin_panel", updated="alumnos_meet"))
+
+
 def make_csv_response(filename: str, rows: list[dict[str, Any]], headers: list[str]) -> Response:
     output = []
     output.append(",".join(headers))
@@ -659,6 +970,38 @@ def download_maestros_completos():
     return make_csv_response("maestros_6_cursos_completos.csv", maestros_completos, headers)
 
 
+@app.get("/admin/download/alumnos/pendientes")
+@report_login_required
+@login_required
+def download_alumnos_pendientes():
+    headers = ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "duracion", "minutos_num", "motivo"]
+
+    if not ALUMNOS_PENDIENTES_PATH.exists():
+        return make_csv_response("alumnos_pendientes_revision.csv", [], headers)
+
+    with ALUMNOS_PENDIENTES_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        rows = list(reader)
+
+    return make_csv_response("alumnos_pendientes_revision.csv", rows, headers)
+
+
+@app.get("/admin/download/alumnos/descartados")
+@report_login_required
+@login_required
+def download_alumnos_descartados():
+    headers = ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "duracion", "minutos_num", "motivo"]
+
+    if not ALUMNOS_DESCARTADOS_PATH.exists():
+        return make_csv_response("alumnos_descartados_menos_30_min.csv", [], headers)
+
+    with ALUMNOS_DESCARTADOS_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        rows = list(reader)
+
+    return make_csv_response("alumnos_descartados_menos_30_min.csv", rows, headers)
+
+
 @app.post("/admin/logout")
 def logout():
     session.clear()
@@ -668,5 +1011,6 @@ def logout():
 if __name__ == "__main__":
     DATA_DIR.mkdir(exist_ok=True)
     ALUMNOS_DATA_DIR.mkdir(exist_ok=True)
+    ALUMNOS_INSUMOS_DIR.mkdir(exist_ok=True)
     app.run(debug=True)
 #jlmh 22276
