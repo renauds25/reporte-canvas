@@ -23,6 +23,10 @@ DATA_DIR = BASE_DIR / "data"
 CAPACITACIONES_PATH = DATA_DIR / "capacitaciones.csv"
 USUARIOS_PATH = DATA_DIR / "usuarios.csv"
 
+ALUMNOS_DATA_DIR = DATA_DIR / "alumnos"
+ALUMNOS_CAPACITACIONES_PATH = ALUMNOS_DATA_DIR / "capacitaciones.csv"
+ALUMNOS_USUARIOS_PATH = ALUMNOS_DATA_DIR / "usuarios.csv"
+
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
 
@@ -50,6 +54,10 @@ MODALIDADES_OFICIALES = [
 ]
 
 MODALIDADES = MODALIDADES_OFICIALES
+
+ALUMNOS_CURSO_OFICIAL = os.getenv("ALUMNOS_CURSO_OFICIAL", "CURSO DE ALUMNOS")
+ALUMNOS_CURSOS_OFICIALES = [ALUMNOS_CURSO_OFICIAL]
+ALUMNOS_MODALIDADES = ["A distancia"]
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
@@ -114,11 +122,11 @@ def parse_date(value: str) -> datetime:
             continue
     return datetime.min
 
-def get_last_update_label() -> str:
-    if CAPACITACIONES_PATH.exists():
+def get_last_update_label(path: Path = CAPACITACIONES_PATH) -> str:
+    if path.exists():
         mexico_tz = ZoneInfo("America/Mexico_City")
         modified_utc = datetime.fromtimestamp(
-            CAPACITACIONES_PATH.stat().st_mtime,
+            path.stat().st_mtime,
             tz=timezone.utc,
         )
         modified_mexico = modified_utc.astimezone(mexico_tz)
@@ -158,12 +166,12 @@ def normalize_training_row(row: dict[str, str]) -> dict[str, str]:
     }
 
 
-def read_users() -> list[dict[str, str]]:
-    if not USUARIOS_PATH.exists():
+def read_users(path: Path = USUARIOS_PATH) -> list[dict[str, str]]:
+    if not path.exists():
         return []
 
     users: list[dict[str, str]] = []
-    with USUARIOS_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
         for raw_row in reader:
             user = normalize_user_row(raw_row)
@@ -172,12 +180,12 @@ def read_users() -> list[dict[str, str]]:
     return users
 
 
-def read_capacitaciones() -> list[dict[str, str]]:
-    if not CAPACITACIONES_PATH.exists():
+def read_capacitaciones(path: Path = CAPACITACIONES_PATH) -> list[dict[str, str]]:
+    if not path.exists():
         return []
 
     rows: list[dict[str, str]] = []
-    with CAPACITACIONES_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
         for raw_row in reader:
             row = normalize_training_row(raw_row)
@@ -222,15 +230,26 @@ def resolve_person(row: dict[str, str], by_id: dict[str, dict[str, str]], by_ema
     return fallback, None, "sin_coincidencia"
 
 
-def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dict[str, Any]:
+def build_report(
+    rows: list[dict[str, str]],
+    users: list[dict[str, str]],
+    cursos_oficiales: list[str] | None = None,
+    modalidades: list[str] | None = None,
+    cursos_requeridos: int | None = None,
+    ultima_actualizacion_path: Path = CAPACITACIONES_PATH,
+) -> dict[str, Any]:
+    cursos_oficiales = cursos_oficiales or CURSOS_OFICIALES
+    modalidades = modalidades or MODALIDADES
+    cursos_requeridos = cursos_requeridos or len(cursos_oficiales)
+
     by_id, by_email, by_name = build_user_indexes(users)
 
     personas: dict[str, dict[str, Any]] = {}
     por_modalidad: dict[str, dict[str, list[dict[str, str]]]] = {
-        modalidad: {curso: [] for curso in CURSOS_OFICIALES} for modalidad in MODALIDADES
+        modalidad: {curso: [] for curso in cursos_oficiales} for modalidad in modalidades
     }
-    conteo_por_modalidad = {modalidad: 0 for modalidad in MODALIDADES}
-    conteo_por_curso_unico: dict[str, set[str]] = {curso: set() for curso in CURSOS_OFICIALES}
+    conteo_por_modalidad = {modalidad: 0 for modalidad in modalidades}
+    conteo_por_curso_unico: dict[str, set[str]] = {curso: set() for curso in cursos_oficiales}
     registros_unicos_total: set[tuple[str, str]] = set()
     registros_sin_coincidencia: list[dict[str, str]] = []
     registros_detalle: list[dict[str, str]] = []
@@ -320,8 +339,8 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
     for persona in personas.values():
         cursos_unicos = {curso["curso"] for curso in persona["cursos"]}
         persona["total_cursos"] = len(cursos_unicos)
-        persona["completo"] = len(cursos_unicos) >= 6
-        persona["pendientes"] = max(0, 6 - len(cursos_unicos))
+        persona["completo"] = len(cursos_unicos) >= cursos_requeridos
+        persona["pendientes"] = max(0, cursos_requeridos - len(cursos_unicos))
         persona["cursos"] = sorted(
             persona["cursos"],
             key=lambda item: parse_date(item["fecha_actualizacion"]),
@@ -346,7 +365,7 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
     total_personas_reporte = total_usuarios_esperados if users else len(personas_lista)
     personas_con_avance = len(personas_lista)
     personas_completas = sum(1 for persona in personas_lista if persona["completo"])
-    cursos_1_y_2 = {norm(curso) for curso in CURSOS_OFICIALES[:2]}
+    cursos_1_y_2 = {norm(curso) for curso in cursos_oficiales[:2]}
     personas_con_cursos_1_y_2 = sum(
         1
         for persona in personas_lista
@@ -361,8 +380,8 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
         personas_pendientes = personas_pendientes_con_avance
 
     return {
-        "cursos_oficiales": CURSOS_OFICIALES,
-        "modalidades": MODALIDADES,
+        "cursos_oficiales": cursos_oficiales,
+        "modalidades": modalidades,
         "total_usuarios_esperados": total_usuarios_esperados,
         "total_personas": total_personas_reporte,
         "personas_con_avance": personas_con_avance,
@@ -382,7 +401,7 @@ def build_report(rows: list[dict[str, str]], users: list[dict[str, str]]) -> dic
         "usuarios_sin_iniciar_lista": usuarios_sin_iniciar,
         "registros_sin_coincidencia": registros_sin_coincidencia,
         "total_registros_sin_coincidencia": len(registros_sin_coincidencia),
-        "ultima_actualizacion": get_last_update_label(),
+        "ultima_actualizacion": get_last_update_label(ultima_actualizacion_path),
         "usa_base_maestra": bool(users),
     }
 
@@ -429,6 +448,41 @@ def api_datos():
     return jsonify({
         "capacitaciones": read_capacitaciones(),
         "usuarios": read_users(),
+    })
+
+
+
+
+@app.get("/alumnos")
+@report_login_required
+@login_required
+def alumnos():
+    return render_template("alumnos.html", **template_context())
+
+
+@app.get("/api/alumnos/reporte")
+@report_login_required
+@login_required
+def api_alumnos_reporte():
+    rows = read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH)
+    users = read_users(ALUMNOS_USUARIOS_PATH)
+    return jsonify(build_report(
+        rows,
+        users,
+        cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
+        modalidades=ALUMNOS_MODALIDADES,
+        cursos_requeridos=1,
+        ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
+    ))
+
+
+@app.get("/api/alumnos/datos")
+@report_login_required
+@login_required
+def api_alumnos_datos():
+    return jsonify({
+        "capacitaciones": read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
+        "usuarios": read_users(ALUMNOS_USUARIOS_PATH),
     })
 
 
@@ -613,5 +667,6 @@ def logout():
 
 if __name__ == "__main__":
     DATA_DIR.mkdir(exist_ok=True)
+    ALUMNOS_DATA_DIR.mkdir(exist_ok=True)
     app.run(debug=True)
 #jlmh 22276

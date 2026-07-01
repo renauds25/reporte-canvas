@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reporte de alumnos | Canvas</title>
+    <link rel="shortcut icon" href="/static/img/CANVAS.ico" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="hero banner-hero">
+        <img class="hero-banner" src="{{ url_for('static', filename='img/banner-reporte-capacitacion.svg') }}" alt="Reporte integral de capacitaciones Canvas LMS">
+        <div class="auth-pill">
+            <span>Módulo privado: alumnos</span>
+            <a href="{{ url_for('admin_panel') }}">Admin</a>
+            <a href="{{ url_for('logout_report') }}">Salir</a>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="section">
+            <div class="section-title">
+                <div>
+                    <h1>Reporte de alumnos</h1>
+                    <p id="alumnosUltimaActualizacion">Cargando datos...</p>
+                </div>
+            </div>
+            <div class="cards mini">
+                <article class="card">
+                    <span>Total de alumnos</span>
+                    <strong id="alumnosTotalPersonas">0</strong>
+                </article>
+                <article class="card">
+                    <span>Con avance</span>
+                    <strong id="alumnosConAvance">0</strong>
+                </article>
+                <article class="card">
+                    <span>Cursos registrados</span>
+                    <strong id="alumnosTotalRegistros">0</strong>
+                </article>
+                <article class="card success">
+                    <span>Completos</span>
+                    <strong id="alumnosCompletos">0</strong>
+                </article>
+                <article class="card warning">
+                    <span>Pendientes</span>
+                    <strong id="alumnosPendientes">0</strong>
+                </article>
+                <article class="card warning">
+                    <span>Sin iniciar</span>
+                    <strong id="alumnosSinIniciar">0</strong>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-title">
+                <div>
+                    <h2>Buscar alumno</h2>
+                    <p>Busca por nombre, ID o correo para ver su avance.</p>
+                </div>
+            </div>
+            <input id="alumnosSearchInput" class="search" type="search" placeholder="Ejemplo: 'Usuario', '12345' o 'correo@iest.edu.mx'">
+            <div id="alumnosSearchResults" class="search-results"></div>
+        </section>
+
+        <section class="section">
+            <div class="panel course-progress-panel">
+                <div class="panel-title-row">
+                    <div>
+                        <h2>Avance del curso</h2>
+                        <p class="muted small-note">Participantes con registro válido en el curso de alumnos.</p>
+                    </div>
+                </div>
+                <div id="alumnosCursoResumen" class="summary-list progress-list"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/alumnos.js') }}"></script>
+</body>
+</html>
