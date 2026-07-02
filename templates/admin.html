@@ -155,6 +155,8 @@
                     <a class="btn secondary" href="{{ url_for('alumnos') }}">Abrir reporte de alumnos</a>
                     <a class="btn secondary" href="/admin/download/alumnos/pendientes">Descargar pendientes alumnos</a>
                     <a class="btn secondary" href="/admin/download/alumnos/descartados">Descargar descartados alumnos</a>
+                    <a class="btn secondary" href="/admin/download/maestros/meet-pendientes">Descargar pendientes Meet maestros</a>
+                    <a class="btn secondary" href="/admin/download/maestros/meet-descartados">Descargar descartados Meet maestros</a>
                 </div>
 
                 <form method="post" action="/admin/upload/alumnos/usuarios" enctype="multipart/form-data" class="form admin-upload-form" data-upload-type="alumnos_usuarios">
@@ -179,7 +181,7 @@
 
                 <form method="post" action="/admin/alumnos/descargar-meet" class="form">
                     <h3>Automatización Gmail / Google Meet</h3>
-                    <p class="muted small-note">Busca correos procesados por Apps Script, descarga los CSV adjuntos y procesa los registros nuevos. Al terminar, etiqueta los correos en Gmail como meet_python_descargado para no volver a descargarlos. Los asuntos [MEET ALUMNOS] se procesan en alumnos; [MEET MAESTROS] se guardan para el módulo de maestros.</p>
+                    <p class="muted small-note">Busca correos procesados por Apps Script, descarga los CSV adjuntos y procesa los registros nuevos. Al terminar, etiqueta los correos en Gmail como meet_python_descargado para no volver a descargarlos. Los asuntos [MEET ALUMNOS] se procesan en alumnos; [MEET MAESTROS] se procesan en maestros usando data/maestros/horarios_cursos.csv.</p>
 
                     <label for="alumnosCursoGmail">Nombre del curso</label>
                     <input id="alumnosCursoGmail" name="curso" type="text" value="CURSO DE ALUMNOS" required>

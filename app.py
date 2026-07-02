@@ -38,6 +38,9 @@ ALUMNOS_MEET_PROCESADOS_PATH = ALUMNOS_DATA_DIR / "meet_descargados.csv"
 
 MAESTROS_DATA_DIR = DATA_DIR / "maestros"
 MAESTROS_INSUMOS_MEET_DIR = MAESTROS_DATA_DIR / "insumos_meet"
+MAESTROS_HORARIOS_PATH = MAESTROS_DATA_DIR / "horarios_cursos.csv"
+MAESTROS_PENDIENTES_MEET_PATH = MAESTROS_DATA_DIR / "pendientes_revision_meet.csv"
+MAESTROS_DESCARTADOS_MEET_PATH = MAESTROS_DATA_DIR / "descartados_menos_30_min_meet.csv"
 
 GOOGLE_CREDENTIALS_PATH = BASE_DIR / os.getenv("GOOGLE_CREDENTIALS_FILE", "credentials.json")
 GOOGLE_TOKEN_PATH = BASE_DIR / os.getenv("GOOGLE_TOKEN_FILE", "token_gmail.json")
@@ -82,7 +85,9 @@ MODALIDADES = MODALIDADES_OFICIALES
 ALUMNOS_CURSO_OFICIAL = os.getenv("ALUMNOS_CURSO_OFICIAL", "CURSO DE ALUMNOS")
 ALUMNOS_CURSOS_OFICIALES = [ALUMNOS_CURSO_OFICIAL]
 ALUMNOS_MODALIDADES = ["A distancia"]
-ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "5"))
+ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "30"))
+MAESTROS_MINUTOS_MINIMOS = int(os.getenv("MAESTROS_MINUTOS_MINIMOS", "5"))
+MAESTROS_HORARIOS_TOLERANCIA_MINUTOS = int(os.getenv("MAESTROS_HORARIOS_TOLERANCIA_MINUTOS", "15"))
 
 
 class MeetAutomationError(RuntimeError):
@@ -229,6 +234,16 @@ def normalize_meet_row(row: dict[str, str]) -> dict[str, str]:
             row,
             "duracion", "Duración", "duracion total", "Duración total",
             "duracion total minutos", "Duración total minutos", "duration", "duration minutes",
+        ),
+        "hora_unio": get_value(
+            row,
+            "hora a la que se unio", "Hora a la que se unió", "hora a la que se unió",
+            "hora de entrada", "hora entrada", "join time", "joined", "time joined",
+        ),
+        "hora_salio": get_value(
+            row,
+            "hora a la que salio", "Hora a la que salió", "hora a la que se salió",
+            "hora de salida", "hora salida", "leave time", "left", "time left",
         ),
         "fecha_actualizacion": get_value(row, "fecha_actualizacion", "fecha", "Fecha", "date"),
     }
@@ -449,6 +464,227 @@ def parse_meet_subject_date(subject: str, fallback_timestamp_ms: str | None = No
     return format_date_label()
 
 
+
+def parse_time_value(value: Any) -> tuple[int, int] | None:
+    text = clean(value).lower()
+
+    if not text:
+        return None
+
+    text = text.replace(".", " ").replace("_", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    text = text.replace("p m", "pm").replace("a m", "am")
+
+    match = re.search(r"(\d{1,2})\s*[: ]\s*(\d{2})\s*(am|pm)?", text, flags=re.IGNORECASE)
+    if not match:
+        match = re.search(r"^(\d{1,2})\s*(am|pm)$", text, flags=re.IGNORECASE)
+        if not match:
+            return None
+        hour = int(match.group(1))
+        minute = 0
+        meridian = match.group(2)
+    else:
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+        meridian = match.group(3)
+
+    if meridian:
+        meridian = meridian.lower()
+        if meridian == "pm" and hour < 12:
+            hour += 12
+        if meridian == "am" and hour == 12:
+            hour = 0
+
+    if 0 <= hour <= 23 and 0 <= minute <= 59:
+        return hour, minute
+
+    return None
+
+
+def parse_meet_subject_datetime(subject: str, fallback_timestamp_ms: str | None = None) -> datetime | None:
+    subject = repair_mojibake(subject)
+    normalized_subject = subject.replace("_", " ").replace("-", " ")
+    month_map = {
+        "ene": 1, "enero": 1,
+        "feb": 2, "febrero": 2,
+        "mar": 3, "marzo": 3,
+        "abr": 4, "abril": 4,
+        "may": 5, "mayo": 5,
+        "jun": 6, "junio": 6,
+        "jul": 7, "julio": 7,
+        "ago": 8, "agosto": 8,
+        "sep": 9, "sept": 9, "septiembre": 9,
+        "oct": 10, "octubre": 10,
+        "nov": 11, "noviembre": 11,
+        "dic": 12, "diciembre": 12,
+    }
+
+    match = re.search(
+        r"(\d{1,2})\s+([a-záéíóúñ]{3,12})\s+(\d{4})(?:.*?(\d{1,2})\s*[: ]\s*(\d{2})\s*(am|pm)?)?",
+        normalized_subject,
+        flags=re.IGNORECASE,
+    )
+
+    if match:
+        day = int(match.group(1))
+        month_text = norm(match.group(2))
+        year = int(match.group(3))
+        month = month_map.get(month_text)
+        if month:
+            hour = int(match.group(4) or 0)
+            minute = int(match.group(5) or 0)
+            meridian = (match.group(6) or "").lower()
+            if meridian == "pm" and hour < 12:
+                hour += 12
+            if meridian == "am" and hour == 12:
+                hour = 0
+            return datetime(year, month, day, hour, minute)
+
+    if fallback_timestamp_ms:
+        try:
+            mexico_tz = ZoneInfo("America/Mexico_City")
+            timestamp = int(fallback_timestamp_ms) / 1000
+            return datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone(mexico_tz).replace(tzinfo=None)
+        except (TypeError, ValueError):
+            pass
+
+    return None
+
+
+def parse_date_value(value: Any) -> datetime | None:
+    value = clean(value)
+
+    if not value:
+        return None
+
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
+def canonicalize_maestro_course(value: Any) -> str:
+    text = clean(value)
+    text_norm = norm(text)
+
+    if not text_norm:
+        return ""
+
+    for official in CURSOS_OFICIALES:
+        if norm(official) == text_norm:
+            return official
+
+    for index, official in enumerate(CURSOS_OFICIALES, start=1):
+        if f"canvas {index}" in text_norm or f"canvas{index}" in text_norm or f"curso {index}" in text_norm:
+            return official
+
+    if "introduccion" in text_norm or "apuntes" in text_norm:
+        return CURSOS_OFICIALES[0]
+    if "tareas" in text_norm and "speedgrader" in text_norm:
+        return CURSOS_OFICIALES[1]
+    if "grupos" in text_norm or "equipos" in text_norm:
+        return CURSOS_OFICIALES[2]
+    if "rubrica" in text_norm or "rubricas" in text_norm:
+        return CURSOS_OFICIALES[3]
+    if "foro" in text_norm or "foros" in text_norm or "discusion" in text_norm:
+        return CURSOS_OFICIALES[4]
+    if "examen" in text_norm or "examenes" in text_norm:
+        return CURSOS_OFICIALES[5]
+
+    return text
+
+
+def read_maestros_horarios() -> list[dict[str, Any]]:
+    if not MAESTROS_HORARIOS_PATH.exists():
+        return []
+
+    horarios: list[dict[str, Any]] = []
+    with MAESTROS_HORARIOS_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            curso = canonicalize_maestro_course(get_value(row, "curso", "Curso"))
+            modalidad = get_value(row, "modalidad", "Modalidad") or "A distancia"
+            fecha_raw = get_value(row, "fecha", "Fecha")
+            hora_inicio_raw = get_value(row, "hora_inicio", "hora inicio", "Hora inicio", "inicio")
+            hora_fin_raw = get_value(row, "hora_fin", "hora fin", "Hora fin", "fin")
+            fecha_dt = parse_date_value(fecha_raw)
+            hora_inicio = parse_time_value(hora_inicio_raw)
+            hora_fin = parse_time_value(hora_fin_raw)
+
+            if not curso or not fecha_dt or not hora_inicio or not hora_fin:
+                continue
+
+            inicio_minutos = hora_inicio[0] * 60 + hora_inicio[1]
+            fin_minutos = hora_fin[0] * 60 + hora_fin[1]
+
+            horarios.append({
+                "curso": curso,
+                "modalidad": normalizar_modalidad_simple(modalidad),
+                "fecha": fecha_dt.date(),
+                "fecha_label": fecha_dt.strftime("%d/%m/%Y"),
+                "hora_inicio": hora_inicio_raw,
+                "hora_fin": hora_fin_raw,
+                "inicio_minutos": inicio_minutos,
+                "fin_minutos": fin_minutos,
+            })
+
+    return horarios
+
+
+def normalizar_modalidad_simple(value: Any) -> str:
+    text_norm = norm(value)
+    if "presencial" in text_norm:
+        return "Presencial"
+    if "linea" in text_norm or "online" in text_norm or "virtual" in text_norm:
+        return "En línea"
+    if "distancia" in text_norm or "zoom" in text_norm or "meet" in text_norm or "remoto" in text_norm:
+        return "A distancia"
+    return clean(value) or "A distancia"
+
+
+def buscar_horario_maestro(
+    horarios: list[dict[str, Any]],
+    fecha_reunion: datetime | None,
+    hora_participante: str = "",
+) -> dict[str, Any] | None:
+    if not horarios or not fecha_reunion:
+        return None
+
+    fecha = fecha_reunion.date()
+    hora = parse_time_value(hora_participante)
+    minutos = None
+
+    if hora:
+        minutos = hora[0] * 60 + hora[1]
+    elif fecha_reunion.hour or fecha_reunion.minute:
+        minutos = fecha_reunion.hour * 60 + fecha_reunion.minute
+
+    candidatos_fecha = [horario for horario in horarios if horario["fecha"] == fecha]
+
+    if not candidatos_fecha:
+        return None
+
+    if minutos is None:
+        return candidatos_fecha[0] if len(candidatos_fecha) == 1 else None
+
+    tolerancia = MAESTROS_HORARIOS_TOLERANCIA_MINUTOS
+    candidatos_hora = [
+        horario
+        for horario in candidatos_fecha
+        if (horario["inicio_minutos"] - tolerancia) <= minutos <= (horario["fin_minutos"] + tolerancia)
+    ]
+
+    if candidatos_hora:
+        return sorted(
+            candidatos_hora,
+            key=lambda horario: abs(minutos - horario["inicio_minutos"]),
+        )[0]
+
+    return None
+
 def safe_download_filename(prefix: str, original_name: str) -> str:
     original_name = original_name or "asistencia_meet.csv"
     if not original_name.lower().endswith(".csv"):
@@ -640,7 +876,7 @@ def download_meet_reports_from_gmail(
 
     processed = read_processed_meet_records()
     downloaded_alumnos_files: list[tuple[Path, str]] = []
-    downloaded_maestros_files: list[Path] = []
+    downloaded_maestros_files: list[tuple[Path, str, str]] = []
     processed_rows: list[dict[str, Any]] = []
     skipped = 0
     sin_csv = 0
@@ -708,7 +944,7 @@ def download_meet_reports_from_gmail(
                 if tipo == "alumnos":
                     downloaded_alumnos_files.append((destination, fecha_reunion))
                 else:
-                    downloaded_maestros_files.append(destination)
+                    downloaded_maestros_files.append((destination, fecha_reunion, subject))
 
                 processed_rows.append({
                     "mensaje_id": message_id,
@@ -796,7 +1032,7 @@ def download_meet_reports_from_gmail(
             if tipo == "alumnos":
                 downloaded_alumnos_files.append((destination, fecha_reunion))
             else:
-                downloaded_maestros_files.append(destination)
+                downloaded_maestros_files.append((destination, fecha_reunion, subject))
 
             processed_rows.append({
                 "mensaje_id": message_id,
@@ -831,6 +1067,23 @@ def download_meet_reports_from_gmail(
         "total_capacitaciones": len(read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH)),
     }
 
+    archivos_maestros_pendientes = [
+        (path, parse_meet_subject_date(path.name), path.name)
+        for path in MAESTROS_INSUMOS_MEET_DIR.glob("*.csv")
+        if path.is_file() and path.parent.name != "procesados"
+    ]
+    maestros_source_files = downloaded_maestros_files + [
+        item for item in archivos_maestros_pendientes if item[0] not in {downloaded[0] for downloaded in downloaded_maestros_files}
+    ]
+
+    resultado_maestros = process_meet_maestros_csv_batch(maestros_source_files) if maestros_source_files else {
+        "procesados_maestros": 0,
+        "validos_maestros": 0,
+        "pendientes_maestros": 0,
+        "descartados_maestros": 0,
+        "total_capacitaciones_maestros": len(read_capacitaciones(CAPACITACIONES_PATH)),
+    }
+
     if GMAIL_MEET_MOVE_PROCESSED_FILES and downloaded_alumnos_files:
         moved_files = move_files_to_processed_folder([path for path, _ in downloaded_alumnos_files])
         archivos_movidos = len(moved_files)
@@ -847,6 +1100,7 @@ def download_meet_reports_from_gmail(
         "errores_drive": errores_drive,
         "omitidos_por_duplicado": skipped,
         **resultado_proceso,
+        **resultado_maestros,
     }
 
 
@@ -942,6 +1196,147 @@ def process_meet_csv_batch(
         "total_capacitaciones": len(all_rows),
     }
 
+
+
+def process_meet_maestros_csv_batch(
+    source_files: list[tuple[Path, str, str]],
+) -> dict[str, Any]:
+    if not source_files:
+        return {
+            "procesados_maestros": 0,
+            "validos_maestros": 0,
+            "pendientes_maestros": 0,
+            "descartados_maestros": 0,
+            "total_capacitaciones_maestros": len(read_capacitaciones(CAPACITACIONES_PATH)),
+        }
+
+    users = read_users(USUARIOS_PATH)
+    by_id, by_email, by_name = build_user_indexes(users)
+    horarios = read_maestros_horarios()
+    existing_rows = read_capacitaciones(CAPACITACIONES_PATH)
+
+    nuevos: list[dict[str, str]] = []
+    pendientes: list[dict[str, Any]] = []
+    descartados: list[dict[str, Any]] = []
+    processed_paths: list[Path] = []
+
+    for source_path, fecha_reunion_label, subject in source_files:
+        if not source_path.exists() or source_path.parent.name == "procesados":
+            continue
+
+        subject_for_date = subject or source_path.name
+        fecha_reunion_dt = parse_meet_subject_datetime(subject_for_date)
+        if not fecha_reunion_dt:
+            fecha_reunion_dt = parse_date_value(fecha_reunion_label)
+
+        fecha_default = format_date_label(fecha_reunion_dt.strftime("%d/%m/%Y") if fecha_reunion_dt else fecha_reunion_label)
+
+        try:
+            with source_path.open("r", encoding="utf-8-sig", newline="") as file:
+                reader = csv.DictReader(file)
+                for raw_row in reader:
+                    meet_row = normalize_meet_row(raw_row)
+                    nombre = clean(meet_row.get("nombre", "")).upper()
+                    correo = normalize_email(meet_row.get("correo", ""))
+                    duracion_texto = meet_row.get("duracion", "")
+                    minutos = parse_duration_minutes(duracion_texto)
+                    hora_unio = clean(meet_row.get("hora_unio", ""))
+                    fecha = format_date_label(meet_row.get("fecha_actualizacion") or fecha_default)
+                    horario = buscar_horario_maestro(horarios, fecha_reunion_dt, hora_unio)
+
+                    base_record = by_email.get(correo) if correo else None
+                    if not base_record and nombre:
+                        base_record = by_name.get(norm(nombre))
+
+                    registro_base = {
+                        "id": base_record.get("id", "") if base_record else "",
+                        "nombre": base_record.get("nombre", "") if base_record else nombre,
+                        "correo": base_record.get("correo", "") if base_record else correo,
+                        "carrera": base_record.get("carrera", "") if base_record else "No disponible",
+                        "division": base_record.get("division", "") if base_record else "No disponible",
+                        "curso": horario.get("curso", "") if horario else "",
+                        "modalidad": horario.get("modalidad", "A distancia") if horario else "A distancia",
+                        "fecha_actualizacion": horario.get("fecha_label", fecha) if horario else fecha,
+                        "duracion": duracion_texto,
+                        "minutos_num": "" if minutos is None else round(minutos, 2),
+                        "archivo_origen": source_path.name,
+                        "hora_unio": hora_unio,
+                    }
+
+                    if not correo:
+                        pendientes.append({**registro_base, "motivo": "sin_correo"})
+                        continue
+
+                    if not base_record:
+                        pendientes.append({**registro_base, "motivo": "correo_no_en_base_maestros"})
+                        continue
+
+                    if not horario:
+                        pendientes.append({**registro_base, "motivo": "sin_horario_curso"})
+                        continue
+
+                    if minutos is None:
+                        pendientes.append({**registro_base, "motivo": "duracion_no_valida"})
+                        continue
+
+                    if minutos < MAESTROS_MINUTOS_MINIMOS:
+                        descartados.append({**registro_base, "motivo": f"menos_de_{MAESTROS_MINUTOS_MINIMOS}_minutos"})
+                        continue
+
+                    nuevos.append({
+                        "id": base_record.get("id", ""),
+                        "nombre": base_record.get("nombre", "") or nombre,
+                        "correo": base_record.get("correo", "") or correo,
+                        "carrera": base_record.get("carrera", "") or "No disponible",
+                        "division": base_record.get("division", "") or "No disponible",
+                        "curso": horario["curso"],
+                        "modalidad": horario["modalidad"],
+                        "fecha_actualizacion": horario.get("fecha_label", fecha),
+                    })
+            processed_paths.append(source_path)
+        except UnicodeDecodeError:
+            pendientes.append({
+                "id": "",
+                "nombre": "",
+                "correo": "",
+                "carrera": "No disponible",
+                "division": "No disponible",
+                "curso": "",
+                "modalidad": "A distancia",
+                "fecha_actualizacion": fecha_default,
+                "duracion": "",
+                "minutos_num": "",
+                "archivo_origen": source_path.name,
+                "hora_unio": "",
+                "motivo": "csv_no_utf8",
+            })
+
+    all_rows = deduplicate_training_rows(existing_rows + nuevos)
+
+    write_csv(
+        CAPACITACIONES_PATH,
+        all_rows,
+        ["id", "nombre", "correo", "carrera", "division", "curso", "modalidad", "fecha_actualizacion"],
+    )
+
+    maestro_aux_headers = [
+        "id", "nombre", "correo", "carrera", "division", "curso", "modalidad",
+        "fecha_actualizacion", "duracion", "minutos_num", "archivo_origen", "hora_unio", "motivo",
+    ]
+
+    write_csv(MAESTROS_PENDIENTES_MEET_PATH, pendientes, maestro_aux_headers)
+    write_csv(MAESTROS_DESCARTADOS_MEET_PATH, descartados, maestro_aux_headers)
+
+    if GMAIL_MEET_MOVE_PROCESSED_FILES and processed_paths:
+        move_files_to_processed_folder(processed_paths)
+
+    return {
+        "procesados_maestros": len(nuevos) + len(pendientes) + len(descartados),
+        "validos_maestros": len(nuevos),
+        "pendientes_maestros": len(pendientes),
+        "descartados_maestros": len(descartados),
+        "total_capacitaciones_maestros": len(all_rows),
+    }
 
 def process_meet_csv(
     source_path: Path,
@@ -1512,6 +1907,7 @@ def descargar_meet_alumnos():
             "ok": True,
             "updated": "alumnos_meet_gmail",
             "resultado": resultado,
+            "reporte": admin_report_payload(),
             "reporte_alumnos": reporte_alumnos,
         })
 
@@ -1612,6 +2008,45 @@ def download_alumnos_descartados():
     return make_csv_response("alumnos_descartados_menos_30_min.csv", rows, headers)
 
 
+
+@app.get("/admin/download/maestros/meet-pendientes")
+@report_login_required
+@login_required
+def download_maestros_meet_pendientes():
+    headers = [
+        "id", "nombre", "correo", "carrera", "division", "curso", "modalidad",
+        "fecha_actualizacion", "duracion", "minutos_num", "archivo_origen", "hora_unio", "motivo",
+    ]
+
+    if not MAESTROS_PENDIENTES_MEET_PATH.exists():
+        return make_csv_response("maestros_meet_pendientes_revision.csv", [], headers)
+
+    with MAESTROS_PENDIENTES_MEET_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        rows = list(reader)
+
+    return make_csv_response("maestros_meet_pendientes_revision.csv", rows, headers)
+
+
+@app.get("/admin/download/maestros/meet-descartados")
+@report_login_required
+@login_required
+def download_maestros_meet_descartados():
+    headers = [
+        "id", "nombre", "correo", "carrera", "division", "curso", "modalidad",
+        "fecha_actualizacion", "duracion", "minutos_num", "archivo_origen", "hora_unio", "motivo",
+    ]
+
+    if not MAESTROS_DESCARTADOS_MEET_PATH.exists():
+        return make_csv_response("maestros_meet_descartados_menos_30_min.csv", [], headers)
+
+    with MAESTROS_DESCARTADOS_MEET_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        rows = list(reader)
+
+    return make_csv_response("maestros_meet_descartados_menos_30_min.csv", rows, headers)
+
+
 @app.post("/admin/logout")
 def logout():
     session.clear()
@@ -1622,5 +2057,7 @@ if __name__ == "__main__":
     DATA_DIR.mkdir(exist_ok=True)
     ALUMNOS_DATA_DIR.mkdir(exist_ok=True)
     ALUMNOS_INSUMOS_DIR.mkdir(exist_ok=True)
+    MAESTROS_DATA_DIR.mkdir(exist_ok=True)
+    MAESTROS_INSUMOS_MEET_DIR.mkdir(exist_ok=True)
     app.run(debug=True)
 #jlmh 22276
