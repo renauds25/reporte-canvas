@@ -33,16 +33,27 @@ function renderCurso(reporte) {
     container.innerHTML = cursos.map((curso) => {
         const completados = Number(conteo[curso] || 0);
         const porcentaje = total ? Math.round((completados / total) * 1000) / 10 : 0;
+        const progreso = Math.max(0, Math.min(porcentaje, 100));
+        const porcentajeTexto = `${porcentaje}%`;
+        const detalle = `${formatNumber(completados)} de ${formatNumber(total)} alumnos`;
+
         return `
-            <div class="summary-row progress-row">
-                <div>
-                    <strong>${curso}</strong>
-                    <small>${formatNumber(completados)} de ${formatNumber(total)} alumnos</small>
+            <div class="summary-row summary-row-metric progress-row">
+                <div class="course-progress-info">
+                    <span>${curso}</span>
+                    <div class="progress-track" aria-label="${curso}: ${porcentajeTexto}">
+                        <div class="progress-fill" style="width: ${progreso}%"></div>
+                    </div>
                 </div>
-                <span>${porcentaje}%</span>
+                <div class="metric-column" title="${detalle}">
+                    <strong class="metric-value">${porcentajeTexto}</strong>
+                    <small>${detalle}</small>
+                </div>
             </div>
         `;
     }).join("");
+
+    requestAnimationFrame(initProgressScrollAnimations);
 }
 
 function renderResultados(query = "") {
@@ -102,6 +113,33 @@ function renderResultados(query = "") {
             </article>
         `;
     }).join("");
+}
+
+function initProgressScrollAnimations() {
+    const rows = document.querySelectorAll(".progress-row");
+
+    if (!rows.length) return;
+
+    rows.forEach(row => row.classList.remove("in-view"));
+
+    if (!("IntersectionObserver" in window)) {
+        rows.forEach(row => row.classList.add("in-view"));
+        return;
+    }
+
+    const observer = new IntersectionObserver(
+        entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("in-view");
+                    observer.unobserve(entry.target);
+                }
+            });
+        },
+        { threshold: 0.35 }
+    );
+
+    rows.forEach(row => observer.observe(row));
 }
 
 async function cargarReporteAlumnos() {
