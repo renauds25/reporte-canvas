@@ -1894,6 +1894,14 @@ def descargar_meet_alumnos():
         users = read_users()
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
 
+    try:
+        resultado_bd = sincronizar_bd_desde_csv()
+    except Exception as exc:
+        resultado_bd = {
+            "ok": False,
+            "error": f"Meet se actualizó, pero no se pudo sincronizar la BD: {exc}",
+        }
+
     reporte_alumnos = build_report(
         read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
         read_users(ALUMNOS_USUARIOS_PATH),
@@ -1908,6 +1916,7 @@ def descargar_meet_alumnos():
             "ok": True,
             "updated": "alumnos_meet_gmail",
             "resultado": resultado,
+            "bd": resultado_bd,
             "reporte": admin_report_payload(),
             "reporte_alumnos": reporte_alumnos,
         })
@@ -2062,6 +2071,18 @@ def ensure_runtime_directories() -> None:
     MAESTROS_INSUMOS_MEET_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def sincronizar_bd_desde_csv() -> dict[str, Any]:
+    from migrar_csv_a_bd import migrar_csv_a_bd
+    from database import DATABASE_PATH
+
+    resultado = migrar_csv_a_bd(reiniciar=True)
+    return {
+        "ok": True,
+        "database_path": str(DATABASE_PATH),
+        "resultado": resultado,
+    }
+
+
 def run_actualizar_meet_cli() -> int:
     ensure_runtime_directories()
 
@@ -2074,7 +2095,32 @@ def run_actualizar_meet_cli() -> int:
         print(f"ERROR: No se pudo actualizar Meet: {exc}", file=sys.stderr)
         return 1
 
-    print(json.dumps(resultado, ensure_ascii=False, indent=2))
+    try:
+        resultado_bd = sincronizar_bd_desde_csv()
+    except Exception as exc:
+        print(json.dumps(resultado, ensure_ascii=False, indent=2))
+        print(f"ERROR: Meet se actualizó, pero no se pudo sincronizar la BD: {exc}", file=sys.stderr)
+        return 1
+
+    salida = {
+        "meet": resultado,
+        "bd": resultado_bd,
+    }
+    print(json.dumps(salida, ensure_ascii=False, indent=2))
+    return 0
+
+
+def run_migrar_bd_cli() -> int:
+    ensure_runtime_directories()
+
+    try:
+        resultado_bd = sincronizar_bd_desde_csv()
+    except Exception as exc:
+        print(f"ERROR: No se pudo migrar a BD: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Base de datos generada/actualizada: {resultado_bd['database_path']}")
+    print(json.dumps(resultado_bd["resultado"], ensure_ascii=False, indent=2))
     return 0
 
 
@@ -2083,6 +2129,9 @@ if __name__ == "__main__":
 
     if comando in {"actualizar-meet", "descargar-meet", "meet"}:
         raise SystemExit(run_actualizar_meet_cli())
+
+    if comando in {"migrar-bd", "migrar-db", "bd", "db", "sincronizar-bd", "sync-bd", "sync-db"}:
+        raise SystemExit(run_migrar_bd_cli())
 
     ensure_runtime_directories()
     app.run(debug=True)

@@ -62,7 +62,7 @@ Si funciona, puedes crear una tarea programada desde CMD como administrador.
 Cambia la ruta por la de tu proyecto:
 
 ```bat
-schtasks /Create /TN "Reporte Canvas - Actualizar Meet" /TR "\"C:\Users\renaud.santos\Documents\Canvas\junio julio\reporte-canvas-pruebas\actualizar_meet_y_render.bat\"" /SC DAILY /ST 07:10 /RI 90 /DU 14:00 /F
+schtasks /Create /TN "Reporte Canvas - Actualizar Meet" /TR "\"C:\Users\renaud.santos\Documents\Canvas\junio julio\reporte-canvas-pruebas\actualizar_meet_y_render.bat\"" /SC DAILY /ST 08:30 /RI 90 /DU 12:00 /F
 ```
 
 Eso intenta correr la actualización cada 90 minutos durante 14 horas, empezando a las 07:10.
@@ -70,16 +70,15 @@ Eso intenta correr la actualización cada 90 minutos durante 14 horas, empezando
 Horarios aproximados:
 
 ```text
-07:10
-08:40
-10:10
-11:40
-13:10
-14:40
-16:10
-17:40
-19:10
-20:40
+08:30
+10:00
+11:30
+13:00
+14:30
+16:00
+17:30
+19:00
+20:30
 ```
 
 ## Requisitos
