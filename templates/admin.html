@@ -176,6 +176,19 @@
                     <p class="muted small-note">Se toman Nombre, Apellido, Correo electrónico y Duración. Solo pasan alumnos con 30 minutos o más.</p>
                     <button class="btn" type="submit">Procesar asistencia Meet</button>
                 </form>
+
+                <form method="post" action="/admin/alumnos/descargar-meet" class="form">
+                    <h3>Automatización Gmail / Google Meet</h3>
+                    <p class="muted small-note">Busca correos de Google Meet, descarga los reportes de asistencia y procesa los registros nuevos. No vuelve a procesar correos ya descargados.</p>
+
+                    <label for="alumnosCursoGmail">Nombre del curso</label>
+                    <input id="alumnosCursoGmail" name="curso" type="text" value="CURSO DE ALUMNOS" required>
+
+                    <label for="alumnosMeetQuery">Búsqueda en Gmail</label>
+                    <input id="alumnosMeetQuery" name="query" type="text" value='from:meetings-noreply@google.com subject:"Registros de la reunión" newer_than:60d'>
+
+                    <button class="btn" type="submit">Descargar y procesar Meet desde Gmail</button>
+                </form>
             </section>
 
             <form method="post" action="/admin/logout">
@@ -217,6 +230,7 @@
                 capacitaciones: "Capacitaciones actualizadas",
                 alumnos_usuarios: "Base de alumnos actualizada",
                 alumnos_meet: "Asistencia Meet de alumnos procesada",
+                alumnos_meet_gmail: "Asistencia Meet descargada desde Gmail",
                 error: "No se pudo actualizar",
             };
             const toast = document.createElement("div");

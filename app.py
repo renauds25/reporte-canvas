@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
 import csv
+import html
+import io
 import re
 import os
+import sys
 import unicodedata
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -30,6 +34,15 @@ ALUMNOS_USUARIOS_PATH = ALUMNOS_DATA_DIR / "usuarios.csv"
 ALUMNOS_PENDIENTES_PATH = ALUMNOS_DATA_DIR / "pendientes_revision.csv"
 ALUMNOS_DESCARTADOS_PATH = ALUMNOS_DATA_DIR / "descartados_menos_30_min.csv"
 ALUMNOS_INSUMOS_DIR = ALUMNOS_DATA_DIR / "insumos_meet"
+ALUMNOS_MEET_PROCESADOS_PATH = ALUMNOS_DATA_DIR / "meet_descargados.csv"
+
+GOOGLE_CREDENTIALS_PATH = BASE_DIR / os.getenv("GOOGLE_CREDENTIALS_FILE", "credentials.json")
+GOOGLE_TOKEN_PATH = BASE_DIR / os.getenv("GOOGLE_TOKEN_FILE", "token_gmail.json")
+GMAIL_MEET_QUERY = os.getenv(
+    "GMAIL_MEET_QUERY",
+    'from:meetings-noreply@google.com subject:"Registros de la reunión" newer_than:60d',
+)
+GMAIL_MEET_MAX_RESULTS = int(os.getenv("GMAIL_MEET_MAX_RESULTS", "25"))
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
@@ -63,6 +76,11 @@ ALUMNOS_CURSO_OFICIAL = os.getenv("ALUMNOS_CURSO_OFICIAL", "CURSO DE ALUMNOS")
 ALUMNOS_CURSOS_OFICIALES = [ALUMNOS_CURSO_OFICIAL]
 ALUMNOS_MODALIDADES = ["A distancia"]
 ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "30"))
+
+
+class MeetAutomationError(RuntimeError):
+    pass
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
@@ -295,10 +313,321 @@ def deduplicate_training_rows(rows: list[dict[str, str]]) -> list[dict[str, str]
     return sorted(deduped.values(), key=lambda item: parse_date(item.get("fecha_actualizacion", "")), reverse=True)
 
 
-def process_meet_csv(
-    source_path: Path,
+def read_processed_meet_records() -> set[tuple[str, str]]:
+    if not ALUMNOS_MEET_PROCESADOS_PATH.exists():
+        return set()
+
+    records: set[tuple[str, str]] = set()
+    with ALUMNOS_MEET_PROCESADOS_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            message_id = clean(row.get("mensaje_id"))
+            resource_id = clean(row.get("recurso_id"))
+            if message_id and resource_id:
+                records.add((message_id, resource_id))
+    return records
+
+
+def append_processed_meet_records(rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+
+    headers = [
+        "mensaje_id",
+        "recurso_id",
+        "archivo",
+        "origen",
+        "asunto",
+        "fecha_reunion",
+        "fecha_descarga",
+        "estado",
+    ]
+
+    ALUMNOS_MEET_PROCESADOS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    exists = ALUMNOS_MEET_PROCESADOS_PATH.exists() and ALUMNOS_MEET_PROCESADOS_PATH.stat().st_size > 0
+
+    with ALUMNOS_MEET_PROCESADOS_PATH.open("a", encoding="utf-8-sig", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=headers)
+        if not exists:
+            writer.writeheader()
+        for row in rows:
+            writer.writerow({header: row.get(header, "") for header in headers})
+
+
+def extract_message_header(message: dict[str, Any], header_name: str) -> str:
+    headers = message.get("payload", {}).get("headers", [])
+    for header in headers:
+        if clean(header.get("name", "")).lower() == header_name.lower():
+            return clean(header.get("value", ""))
+    return ""
+
+
+def decode_gmail_body(data: str) -> str:
+    if not data:
+        return ""
+    padded = data + "=" * (-len(data) % 4)
+    try:
+        return base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def iter_gmail_parts(payload: dict[str, Any]):
+    yield payload
+    for part in payload.get("parts", []) or []:
+        yield from iter_gmail_parts(part)
+
+
+def extract_spreadsheet_ids_from_message(message: dict[str, Any]) -> list[str]:
+    combined_text = []
+    for part in iter_gmail_parts(message.get("payload", {})):
+        mime_type = part.get("mimeType", "")
+        body_data = part.get("body", {}).get("data", "")
+        if body_data and mime_type in {"text/html", "text/plain"}:
+            combined_text.append(decode_gmail_body(body_data))
+
+    text = html.unescape("\n".join(combined_text))
+    ids = re.findall(r"https://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]+)", text)
+
+    unique_ids = []
+    seen = set()
+    for spreadsheet_id in ids:
+        if spreadsheet_id not in seen:
+            seen.add(spreadsheet_id)
+            unique_ids.append(spreadsheet_id)
+    return unique_ids
+
+
+def parse_meet_subject_date(subject: str, fallback_timestamp_ms: str | None = None) -> str:
+    subject = repair_mojibake(subject)
+    month_map = {
+        "ene": 1, "enero": 1,
+        "feb": 2, "febrero": 2,
+        "mar": 3, "marzo": 3,
+        "abr": 4, "abril": 4,
+        "may": 5, "mayo": 5,
+        "jun": 6, "junio": 6,
+        "jul": 7, "julio": 7,
+        "ago": 8, "agosto": 8,
+        "sep": 9, "sept": 9, "septiembre": 9,
+        "oct": 10, "octubre": 10,
+        "nov": 11, "noviembre": 11,
+        "dic": 12, "diciembre": 12,
+    }
+
+    match = re.search(
+        r"(\d{1,2})\s+([a-záéíóúñ]{3,12})\s+(\d{4})",
+        subject,
+        flags=re.IGNORECASE,
+    )
+
+    if match:
+        day = int(match.group(1))
+        month_text = norm(match.group(2))
+        year = int(match.group(3))
+        month = month_map.get(month_text)
+        if month:
+            return datetime(year, month, day).strftime("%d/%m/%Y")
+
+    if fallback_timestamp_ms:
+        try:
+            mexico_tz = ZoneInfo("America/Mexico_City")
+            timestamp = int(fallback_timestamp_ms) / 1000
+            return datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone(mexico_tz).strftime("%d/%m/%Y")
+        except (TypeError, ValueError):
+            pass
+
+    return format_date_label()
+
+
+def safe_download_filename(prefix: str, original_name: str) -> str:
+    original_name = original_name or "asistencia_meet.csv"
+    if not original_name.lower().endswith(".csv"):
+        original_name = f"{Path(original_name).stem}.csv"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return secure_filename(f"{timestamp}_{prefix}_{original_name}")
+
+
+def get_google_services():
+    try:
+        from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
+        from google_auth_oauthlib.flow import InstalledAppFlow
+        from googleapiclient.discovery import build
+    except ImportError as exc:
+        raise MeetAutomationError(
+            "Faltan dependencias de Google. Instala con: python -m pip install -r requirements.txt"
+        ) from exc
+
+    scopes = [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/drive.readonly",
+    ]
+
+    if not GOOGLE_CREDENTIALS_PATH.exists():
+        raise MeetAutomationError(
+            f"No encontré {GOOGLE_CREDENTIALS_PATH.name}. Descarga el OAuth Client de Google Cloud "
+            "y guárdalo en la raíz del proyecto."
+        )
+
+    creds = None
+    if GOOGLE_TOKEN_PATH.exists():
+        creds = Credentials.from_authorized_user_file(str(GOOGLE_TOKEN_PATH), scopes)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(str(GOOGLE_CREDENTIALS_PATH), scopes)
+            creds = flow.run_local_server(port=0)
+
+        GOOGLE_TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
+
+    gmail_service = build("gmail", "v1", credentials=creds)
+    drive_service = build("drive", "v3", credentials=creds)
+    return gmail_service, drive_service
+
+
+def download_google_sheet_as_csv(drive_service, spreadsheet_id: str, destination: Path) -> None:
+    try:
+        from googleapiclient.http import MediaIoBaseDownload
+    except ImportError as exc:
+        raise MeetAutomationError(
+            "Faltan dependencias de Google. Instala con: python -m pip install -r requirements.txt"
+        ) from exc
+
+    request_media = drive_service.files().export_media(
+        fileId=spreadsheet_id,
+        mimeType="text/csv",
+    )
+    buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request_media)
+
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+
+    destination.write_bytes(buffer.getvalue())
+
+
+def download_meet_reports_from_gmail(
+    curso: str | None = None,
+    query: str | None = None,
+    max_results: int | None = None,
+) -> dict[str, Any]:
+    gmail_service, drive_service = get_google_services()
+    curso = clean(curso) or ALUMNOS_CURSO_OFICIAL
+    query = query or GMAIL_MEET_QUERY
+    max_results = max_results or GMAIL_MEET_MAX_RESULTS
+
+    processed = read_processed_meet_records()
+    downloaded_files: list[tuple[Path, str]] = []
+    processed_rows: list[dict[str, Any]] = []
+    skipped = 0
+
+    response = gmail_service.users().messages().list(
+        userId="me",
+        q=query,
+        maxResults=max_results,
+    ).execute()
+
+    messages = response.get("messages", [])
+    ALUMNOS_INSUMOS_DIR.mkdir(parents=True, exist_ok=True)
+
+    for message_summary in messages:
+        message_id = message_summary.get("id", "")
+        if not message_id:
+            continue
+
+        message = gmail_service.users().messages().get(
+            userId="me",
+            id=message_id,
+            format="full",
+        ).execute()
+
+        subject = extract_message_header(message, "Subject")
+        fecha_reunion = parse_meet_subject_date(subject, message.get("internalDate"))
+
+        for part in iter_gmail_parts(message.get("payload", {})):
+            filename = clean(part.get("filename"))
+            attachment_id = part.get("body", {}).get("attachmentId")
+
+            if not filename or not attachment_id or not filename.lower().endswith(".csv"):
+                continue
+
+            resource_id = f"attachment:{attachment_id}"
+            if (message_id, resource_id) in processed:
+                skipped += 1
+                continue
+
+            attachment = gmail_service.users().messages().attachments().get(
+                userId="me",
+                messageId=message_id,
+                id=attachment_id,
+            ).execute()
+
+            data = attachment.get("data", "")
+            padded = data + "=" * (-len(data) % 4)
+            content = base64.urlsafe_b64decode(padded.encode("utf-8"))
+
+            destination = ALUMNOS_INSUMOS_DIR / safe_download_filename("gmail", filename)
+            destination.write_bytes(content)
+            downloaded_files.append((destination, fecha_reunion))
+            processed_rows.append({
+                "mensaje_id": message_id,
+                "recurso_id": resource_id,
+                "archivo": destination.name,
+                "origen": "adjunto_csv",
+                "asunto": subject,
+                "fecha_reunion": fecha_reunion,
+                "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "estado": "descargado",
+            })
+
+        for spreadsheet_id in extract_spreadsheet_ids_from_message(message):
+            resource_id = f"sheet:{spreadsheet_id}"
+            if (message_id, resource_id) in processed:
+                skipped += 1
+                continue
+
+            destination = ALUMNOS_INSUMOS_DIR / safe_download_filename("gmail_sheet", f"meet_{spreadsheet_id}.csv")
+            download_google_sheet_as_csv(drive_service, spreadsheet_id, destination)
+            downloaded_files.append((destination, fecha_reunion))
+            processed_rows.append({
+                "mensaje_id": message_id,
+                "recurso_id": resource_id,
+                "archivo": destination.name,
+                "origen": "google_sheet",
+                "asunto": subject,
+                "fecha_reunion": fecha_reunion,
+                "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "estado": "descargado",
+            })
+
+    append_processed_meet_records(processed_rows)
+
+    resultado_proceso = process_meet_csv_batch(
+        downloaded_files,
+        curso=curso,
+    ) if downloaded_files else {
+        "procesados": 0,
+        "validos": 0,
+        "pendientes": 0,
+        "descartados": 0,
+        "total_capacitaciones": len(read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH)),
+    }
+
+    return {
+        "correos_encontrados": len(messages),
+        "archivos_descargados": len(downloaded_files),
+        "omitidos_por_duplicado": skipped,
+        **resultado_proceso,
+    }
+
+
+def process_meet_csv_batch(
+    source_files: list[tuple[Path, str]],
     curso: str,
-    fecha_actualizacion: str = "",
 ) -> dict[str, Any]:
     users = read_users(ALUMNOS_USUARIOS_PATH)
     _, by_email, _ = build_user_indexes(users)
@@ -308,56 +637,57 @@ def process_meet_csv(
     pendientes: list[dict[str, Any]] = []
     descartados: list[dict[str, Any]] = []
 
-    fecha_default = format_date_label(fecha_actualizacion)
+    for source_path, fecha_actualizacion in source_files:
+        fecha_default = format_date_label(fecha_actualizacion)
 
-    with source_path.open("r", encoding="utf-8-sig", newline="") as file:
-        reader = csv.DictReader(file)
+        with source_path.open("r", encoding="utf-8-sig", newline="") as file:
+            reader = csv.DictReader(file)
 
-        for raw_row in reader:
-            meet_row = normalize_meet_row(raw_row)
-            nombre = clean(meet_row.get("nombre", "")).upper()
-            correo = normalize_email(meet_row.get("correo", ""))
-            duracion_texto = meet_row.get("duracion", "")
-            minutos = parse_duration_minutes(duracion_texto)
-            fecha = format_date_label(meet_row.get("fecha_actualizacion") or fecha_default)
+            for raw_row in reader:
+                meet_row = normalize_meet_row(raw_row)
+                nombre = clean(meet_row.get("nombre", "")).upper()
+                correo = normalize_email(meet_row.get("correo", ""))
+                duracion_texto = meet_row.get("duracion", "")
+                minutos = parse_duration_minutes(duracion_texto)
+                fecha = format_date_label(meet_row.get("fecha_actualizacion") or fecha_default)
 
-            base_record = by_email.get(correo) if correo else None
+                base_record = by_email.get(correo) if correo else None
 
-            registro_base = {
-                "id": base_record.get("id", "") if base_record else "",
-                "nombre": base_record.get("nombre", "") if base_record else nombre,
-                "correo": base_record.get("correo", "") if base_record else correo,
-                "curso": curso,
-                "modalidad": "A distancia",
-                "fecha_actualizacion": fecha,
-                "duracion": duracion_texto,
-                "minutos_num": "" if minutos is None else round(minutos, 2),
-            }
+                registro_base = {
+                    "id": base_record.get("id", "") if base_record else "",
+                    "nombre": base_record.get("nombre", "") if base_record else nombre,
+                    "correo": base_record.get("correo", "") if base_record else correo,
+                    "curso": curso,
+                    "modalidad": "A distancia",
+                    "fecha_actualizacion": fecha,
+                    "duracion": duracion_texto,
+                    "minutos_num": "" if minutos is None else round(minutos, 2),
+                }
 
-            if not correo:
-                pendientes.append({**registro_base, "motivo": "sin_correo"})
-                continue
+                if not correo:
+                    pendientes.append({**registro_base, "motivo": "sin_correo"})
+                    continue
 
-            if not base_record:
-                pendientes.append({**registro_base, "motivo": "correo_no_en_base_alumnos"})
-                continue
+                if not base_record:
+                    pendientes.append({**registro_base, "motivo": "correo_no_en_base_alumnos"})
+                    continue
 
-            if minutos is None:
-                pendientes.append({**registro_base, "motivo": "duracion_no_valida"})
-                continue
+                if minutos is None:
+                    pendientes.append({**registro_base, "motivo": "duracion_no_valida"})
+                    continue
 
-            if minutos < ALUMNOS_MINUTOS_MINIMOS:
-                descartados.append({**registro_base, "motivo": f"menos_de_{ALUMNOS_MINUTOS_MINIMOS}_minutos"})
-                continue
+                if minutos < ALUMNOS_MINUTOS_MINIMOS:
+                    descartados.append({**registro_base, "motivo": f"menos_de_{ALUMNOS_MINUTOS_MINIMOS}_minutos"})
+                    continue
 
-            nuevos.append({
-                "id": base_record.get("id", ""),
-                "nombre": base_record.get("nombre", "") or nombre,
-                "correo": base_record.get("correo", "") or correo,
-                "curso": curso,
-                "modalidad": "A distancia",
-                "fecha_actualizacion": fecha,
-            })
+                nuevos.append({
+                    "id": base_record.get("id", ""),
+                    "nombre": base_record.get("nombre", "") or nombre,
+                    "correo": base_record.get("correo", "") or correo,
+                    "curso": curso,
+                    "modalidad": "A distancia",
+                    "fecha_actualizacion": fecha,
+                })
 
     all_rows = deduplicate_training_rows(existing_rows + nuevos)
 
@@ -386,6 +716,17 @@ def process_meet_csv(
         "descartados": len(descartados),
         "total_capacitaciones": len(all_rows),
     }
+
+
+def process_meet_csv(
+    source_path: Path,
+    curso: str,
+    fecha_actualizacion: str = "",
+) -> dict[str, Any]:
+    return process_meet_csv_batch(
+        [(source_path, fecha_actualizacion)],
+        curso=curso,
+    )
 
 
 def read_users(path: Path = USUARIOS_PATH) -> list[dict[str, str]]:
@@ -906,6 +1247,50 @@ def upload_alumnos_meet():
 
     return redirect(url_for("admin_panel", updated="alumnos_meet"))
 
+
+
+@app.post("/admin/alumnos/descargar-meet")
+@report_login_required
+@login_required
+def descargar_meet_alumnos():
+    curso = clean(request.form.get("curso")) or ALUMNOS_CURSO_OFICIAL
+    query = clean(request.form.get("query")) or GMAIL_MEET_QUERY
+
+    try:
+        resultado = download_meet_reports_from_gmail(curso=curso, query=query)
+    except MeetAutomationError as exc:
+        error = str(exc)
+        if wants_json_response():
+            return jsonify({"ok": False, "error": error}), 400
+        rows = read_capacitaciones()
+        users = read_users()
+        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
+    except Exception as exc:
+        error = f"No se pudo descargar Meet desde Gmail: {exc}"
+        if wants_json_response():
+            return jsonify({"ok": False, "error": error}), 400
+        rows = read_capacitaciones()
+        users = read_users()
+        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
+
+    reporte_alumnos = build_report(
+        read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
+        read_users(ALUMNOS_USUARIOS_PATH),
+        cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
+        modalidades=ALUMNOS_MODALIDADES,
+        cursos_requeridos=1,
+        ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
+    )
+
+    if wants_json_response():
+        return jsonify({
+            "ok": True,
+            "updated": "alumnos_meet_gmail",
+            "resultado": resultado,
+            "reporte_alumnos": reporte_alumnos,
+        })
+
+    return redirect(url_for("admin_panel", updated="alumnos_meet_gmail"))
 
 def make_csv_response(filename: str, rows: list[dict[str, Any]], headers: list[str]) -> Response:
     output = []

@@ -2,3 +2,6 @@
 venv/
 __pycache__/
 *.pyc
+credentials.json
+token_gmail.json
+token.json
