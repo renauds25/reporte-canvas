@@ -36,13 +36,20 @@ ALUMNOS_DESCARTADOS_PATH = ALUMNOS_DATA_DIR / "descartados_menos_30_min.csv"
 ALUMNOS_INSUMOS_DIR = ALUMNOS_DATA_DIR / "insumos_meet"
 ALUMNOS_MEET_PROCESADOS_PATH = ALUMNOS_DATA_DIR / "meet_descargados.csv"
 
+MAESTROS_DATA_DIR = DATA_DIR / "maestros"
+MAESTROS_INSUMOS_MEET_DIR = MAESTROS_DATA_DIR / "insumos_meet"
+
 GOOGLE_CREDENTIALS_PATH = BASE_DIR / os.getenv("GOOGLE_CREDENTIALS_FILE", "credentials.json")
 GOOGLE_TOKEN_PATH = BASE_DIR / os.getenv("GOOGLE_TOKEN_FILE", "token_gmail.json")
 GMAIL_MEET_QUERY = os.getenv(
     "GMAIL_MEET_QUERY",
-    'from:meetings-noreply@google.com subject:"Registros de la reunión" newer_than:60d',
+    'subject:"Asistencia procesada" has:attachment newer_than:60d',
 )
 GMAIL_MEET_MAX_RESULTS = int(os.getenv("GMAIL_MEET_MAX_RESULTS", "25"))
+GMAIL_MEET_DRIVE_FALLBACK = os.getenv("GMAIL_MEET_DRIVE_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "si", "sí"}
+GMAIL_MEET_PROCESSED_LABEL = os.getenv("GMAIL_MEET_PROCESSED_LABEL", "meet_python_descargado")
+GMAIL_MEET_ERROR_LABEL = os.getenv("GMAIL_MEET_ERROR_LABEL", "meet_python_error")
+GMAIL_MEET_MOVE_PROCESSED_FILES = os.getenv("GMAIL_MEET_MOVE_PROCESSED_FILES", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
@@ -75,7 +82,7 @@ MODALIDADES = MODALIDADES_OFICIALES
 ALUMNOS_CURSO_OFICIAL = os.getenv("ALUMNOS_CURSO_OFICIAL", "CURSO DE ALUMNOS")
 ALUMNOS_CURSOS_OFICIALES = [ALUMNOS_CURSO_OFICIAL]
 ALUMNOS_MODALIDADES = ["A distancia"]
-ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "30"))
+ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "5"))
 
 
 class MeetAutomationError(RuntimeError):
@@ -341,6 +348,8 @@ def append_processed_meet_records(rows: list[dict[str, Any]]) -> None:
         "fecha_reunion",
         "fecha_descarga",
         "estado",
+        "tipo",
+        "detalle",
     ]
 
     ALUMNOS_MEET_PROCESADOS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -448,6 +457,107 @@ def safe_download_filename(prefix: str, original_name: str) -> str:
     return secure_filename(f"{timestamp}_{prefix}_{original_name}")
 
 
+def clasificar_meet_por_asunto(subject: str) -> str:
+    subject_norm = norm(subject)
+
+    if "meet maestros" in subject_norm:
+        return "maestros"
+
+    if "meet alumnos" in subject_norm:
+        return "alumnos"
+
+    return "alumnos"
+
+
+def get_meet_target_dir(tipo: str) -> Path:
+    if tipo == "maestros":
+        return MAESTROS_INSUMOS_MEET_DIR
+
+    return ALUMNOS_INSUMOS_DIR
+
+
+def get_meet_target_prefix(tipo: str) -> str:
+    return "meet_maestros" if tipo == "maestros" else "meet_alumnos"
+
+
+
+def normalize_gmail_label_name(label_name: str) -> str:
+    return clean(label_name) or "meet_python_descargado"
+
+
+def ensure_gmail_query_excludes_labels(query: str, label_names: list[str]) -> str:
+    query = clean(query)
+    query_norm = norm(query)
+
+    for label_name in label_names:
+        label_name = normalize_gmail_label_name(label_name)
+        label_token = f"label:{label_name}"
+        negative_label_token = f"-label:{label_name}"
+
+        if norm(label_token) in query_norm or norm(negative_label_token) in query_norm:
+            continue
+
+        query = f"{query} -label:{label_name}".strip()
+
+    return query
+
+
+def get_or_create_gmail_label(gmail_service, label_name: str) -> str:
+    label_name = normalize_gmail_label_name(label_name)
+
+    labels_response = gmail_service.users().labels().list(userId="me").execute()
+    for label in labels_response.get("labels", []):
+        if clean(label.get("name", "")).lower() == label_name.lower():
+            return label.get("id", "")
+
+    created = gmail_service.users().labels().create(
+        userId="me",
+        body={
+            "name": label_name,
+            "labelListVisibility": "labelShow",
+            "messageListVisibility": "show",
+        },
+    ).execute()
+
+    return created.get("id", "")
+
+
+def add_gmail_label_to_message(gmail_service, message_id: str, label_id: str) -> None:
+    if not message_id or not label_id:
+        return
+
+    gmail_service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"addLabelIds": [label_id]},
+    ).execute()
+
+
+def move_files_to_processed_folder(files: list[Path], folder_name: str = "procesados") -> list[Path]:
+    moved: list[Path] = []
+
+    for source_path in files:
+        if not source_path.exists():
+            continue
+
+        target_dir = source_path.parent / folder_name
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path = target_dir / source_path.name
+
+        if target_path.exists():
+            stem = source_path.stem
+            suffix = source_path.suffix
+            counter = 2
+            while target_path.exists():
+                target_path = target_dir / f"{stem}_{counter}{suffix}"
+                counter += 1
+
+        source_path.replace(target_path)
+        moved.append(target_path)
+
+    return moved
+
+
 def get_google_services():
     try:
         from google.auth.transport.requests import Request
@@ -460,7 +570,7 @@ def get_google_services():
         ) from exc
 
     scopes = [
-        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/drive.readonly",
     ]
 
@@ -473,6 +583,8 @@ def get_google_services():
     creds = None
     if GOOGLE_TOKEN_PATH.exists():
         creds = Credentials.from_authorized_user_file(str(GOOGLE_TOKEN_PATH), scopes)
+        if hasattr(creds, "has_scopes") and not creds.has_scopes(scopes):
+            creds = None
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -517,13 +629,25 @@ def download_meet_reports_from_gmail(
 ) -> dict[str, Any]:
     gmail_service, drive_service = get_google_services()
     curso = clean(curso) or ALUMNOS_CURSO_OFICIAL
-    query = query or GMAIL_MEET_QUERY
+    query = ensure_gmail_query_excludes_labels(
+        query or GMAIL_MEET_QUERY,
+        [GMAIL_MEET_PROCESSED_LABEL, GMAIL_MEET_ERROR_LABEL],
+    )
     max_results = max_results or GMAIL_MEET_MAX_RESULTS
 
+    processed_label_id = get_or_create_gmail_label(gmail_service, GMAIL_MEET_PROCESSED_LABEL)
+    error_label_id = get_or_create_gmail_label(gmail_service, GMAIL_MEET_ERROR_LABEL)
+
     processed = read_processed_meet_records()
-    downloaded_files: list[tuple[Path, str]] = []
+    downloaded_alumnos_files: list[tuple[Path, str]] = []
+    downloaded_maestros_files: list[Path] = []
     processed_rows: list[dict[str, Any]] = []
     skipped = 0
+    sin_csv = 0
+    errores_drive = 0
+    correos_etiquetados = 0
+    correos_error = 0
+    archivos_movidos = 0
 
     response = gmail_service.users().messages().list(
         userId="me",
@@ -533,6 +657,7 @@ def download_meet_reports_from_gmail(
 
     messages = response.get("messages", [])
     ALUMNOS_INSUMOS_DIR.mkdir(parents=True, exist_ok=True)
+    MAESTROS_INSUMOS_MEET_DIR.mkdir(parents=True, exist_ok=True)
 
     for message_summary in messages:
         message_id = message_summary.get("id", "")
@@ -547,6 +672,11 @@ def download_meet_reports_from_gmail(
 
         subject = extract_message_header(message, "Subject")
         fecha_reunion = parse_meet_subject_date(subject, message.get("internalDate"))
+        tipo = clasificar_meet_por_asunto(subject)
+        target_dir = get_meet_target_dir(tipo)
+        target_prefix = get_meet_target_prefix(tipo)
+        csv_downloaded_for_message = 0
+        message_has_error = False
 
         for part in iter_gmail_parts(message.get("payload", {})):
             filename = clean(part.get("filename"))
@@ -560,39 +690,114 @@ def download_meet_reports_from_gmail(
                 skipped += 1
                 continue
 
-            attachment = gmail_service.users().messages().attachments().get(
-                userId="me",
-                messageId=message_id,
-                id=attachment_id,
-            ).execute()
+            try:
+                attachment = gmail_service.users().messages().attachments().get(
+                    userId="me",
+                    messageId=message_id,
+                    id=attachment_id,
+                ).execute()
 
-            data = attachment.get("data", "")
-            padded = data + "=" * (-len(data) % 4)
-            content = base64.urlsafe_b64decode(padded.encode("utf-8"))
+                data = attachment.get("data", "")
+                padded = data + "=" * (-len(data) % 4)
+                content = base64.urlsafe_b64decode(padded.encode("utf-8"))
 
-            destination = ALUMNOS_INSUMOS_DIR / safe_download_filename("gmail", filename)
-            destination.write_bytes(content)
-            downloaded_files.append((destination, fecha_reunion))
+                destination = target_dir / safe_download_filename(target_prefix, filename)
+                destination.write_bytes(content)
+                csv_downloaded_for_message += 1
+
+                if tipo == "alumnos":
+                    downloaded_alumnos_files.append((destination, fecha_reunion))
+                else:
+                    downloaded_maestros_files.append(destination)
+
+                processed_rows.append({
+                    "mensaje_id": message_id,
+                    "recurso_id": resource_id,
+                    "archivo": destination.name,
+                    "origen": "adjunto_csv",
+                    "asunto": subject,
+                    "fecha_reunion": fecha_reunion,
+                    "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "estado": "descargado",
+                    "tipo": tipo,
+                    "detalle": "CSV adjunto descargado",
+                })
+            except Exception as exc:
+                message_has_error = True
+                processed_rows.append({
+                    "mensaje_id": message_id,
+                    "recurso_id": resource_id,
+                    "archivo": "",
+                    "origen": "adjunto_csv",
+                    "asunto": subject,
+                    "fecha_reunion": fecha_reunion,
+                    "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "estado": "error_adjunto",
+                    "tipo": tipo,
+                    "detalle": str(exc),
+                })
+
+        if csv_downloaded_for_message > 0 and not message_has_error:
+            add_gmail_label_to_message(gmail_service, message_id, processed_label_id)
+            correos_etiquetados += 1
+            continue
+
+        if csv_downloaded_for_message > 0 and message_has_error:
+            add_gmail_label_to_message(gmail_service, message_id, error_label_id)
+            correos_error += 1
+            continue
+
+        if not GMAIL_MEET_DRIVE_FALLBACK:
+            sin_csv += 1
             processed_rows.append({
                 "mensaje_id": message_id,
-                "recurso_id": resource_id,
-                "archivo": destination.name,
-                "origen": "adjunto_csv",
+                "recurso_id": "sin_csv_adjunto",
+                "archivo": "",
+                "origen": "correo",
                 "asunto": subject,
                 "fecha_reunion": fecha_reunion,
                 "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "estado": "descargado",
+                "estado": "omitido",
+                "tipo": tipo,
+                "detalle": "El correo no tenía CSV adjunto. Se omitió Drive para evitar errores de permisos.",
             })
+            add_gmail_label_to_message(gmail_service, message_id, error_label_id)
+            correos_error += 1
+            continue
 
+        sheets_downloaded_for_message = 0
         for spreadsheet_id in extract_spreadsheet_ids_from_message(message):
             resource_id = f"sheet:{spreadsheet_id}"
             if (message_id, resource_id) in processed:
                 skipped += 1
                 continue
 
-            destination = ALUMNOS_INSUMOS_DIR / safe_download_filename("gmail_sheet", f"meet_{spreadsheet_id}.csv")
-            download_google_sheet_as_csv(drive_service, spreadsheet_id, destination)
-            downloaded_files.append((destination, fecha_reunion))
+            destination = target_dir / safe_download_filename(target_prefix, f"meet_{spreadsheet_id}.csv")
+            try:
+                download_google_sheet_as_csv(drive_service, spreadsheet_id, destination)
+            except Exception as exc:
+                errores_drive += 1
+                message_has_error = True
+                processed_rows.append({
+                    "mensaje_id": message_id,
+                    "recurso_id": resource_id,
+                    "archivo": "",
+                    "origen": "google_sheet",
+                    "asunto": subject,
+                    "fecha_reunion": fecha_reunion,
+                    "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "estado": "error_drive",
+                    "tipo": tipo,
+                    "detalle": str(exc),
+                })
+                continue
+
+            sheets_downloaded_for_message += 1
+            if tipo == "alumnos":
+                downloaded_alumnos_files.append((destination, fecha_reunion))
+            else:
+                downloaded_maestros_files.append(destination)
+
             processed_rows.append({
                 "mensaje_id": message_id,
                 "recurso_id": resource_id,
@@ -602,14 +807,23 @@ def download_meet_reports_from_gmail(
                 "fecha_reunion": fecha_reunion,
                 "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
                 "estado": "descargado",
+                "tipo": tipo,
+                "detalle": "Google Sheet exportado a CSV",
             })
+
+        if sheets_downloaded_for_message > 0 and not message_has_error:
+            add_gmail_label_to_message(gmail_service, message_id, processed_label_id)
+            correos_etiquetados += 1
+        elif message_has_error:
+            add_gmail_label_to_message(gmail_service, message_id, error_label_id)
+            correos_error += 1
 
     append_processed_meet_records(processed_rows)
 
     resultado_proceso = process_meet_csv_batch(
-        downloaded_files,
+        downloaded_alumnos_files,
         curso=curso,
-    ) if downloaded_files else {
+    ) if downloaded_alumnos_files else {
         "procesados": 0,
         "validos": 0,
         "pendientes": 0,
@@ -617,9 +831,20 @@ def download_meet_reports_from_gmail(
         "total_capacitaciones": len(read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH)),
     }
 
+    if GMAIL_MEET_MOVE_PROCESSED_FILES and downloaded_alumnos_files:
+        moved_files = move_files_to_processed_folder([path for path, _ in downloaded_alumnos_files])
+        archivos_movidos = len(moved_files)
+
     return {
         "correos_encontrados": len(messages),
-        "archivos_descargados": len(downloaded_files),
+        "archivos_descargados": len(downloaded_alumnos_files) + len(downloaded_maestros_files),
+        "archivos_alumnos_descargados": len(downloaded_alumnos_files),
+        "archivos_maestros_descargados": len(downloaded_maestros_files),
+        "archivos_alumnos_movidos_a_procesados": archivos_movidos,
+        "correos_etiquetados_procesados": correos_etiquetados,
+        "correos_etiquetados_error": correos_error,
+        "correos_sin_csv_adjunto": sin_csv,
+        "errores_drive": errores_drive,
         "omitidos_por_duplicado": skipped,
         **resultado_proceso,
     }

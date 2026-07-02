@@ -179,15 +179,15 @@
 
                 <form method="post" action="/admin/alumnos/descargar-meet" class="form">
                     <h3>Automatización Gmail / Google Meet</h3>
-                    <p class="muted small-note">Busca correos de Google Meet, descarga los reportes de asistencia y procesa los registros nuevos. No vuelve a procesar correos ya descargados.</p>
+                    <p class="muted small-note">Busca correos procesados por Apps Script, descarga los CSV adjuntos y procesa los registros nuevos. Al terminar, etiqueta los correos en Gmail como meet_python_descargado para no volver a descargarlos. Los asuntos [MEET ALUMNOS] se procesan en alumnos; [MEET MAESTROS] se guardan para el módulo de maestros.</p>
 
                     <label for="alumnosCursoGmail">Nombre del curso</label>
                     <input id="alumnosCursoGmail" name="curso" type="text" value="CURSO DE ALUMNOS" required>
 
                     <label for="alumnosMeetQuery">Búsqueda en Gmail</label>
-                    <input id="alumnosMeetQuery" name="query" type="text" value='from:meetings-noreply@google.com subject:"Registros de la reunión" newer_than:60d'>
+                    <input id="alumnosMeetQuery" name="query" type="text" value='subject:"Asistencia procesada" has:attachment newer_than:60d -label:meet_python_descargado -label:meet_python_error'>
 
-                    <button class="btn" type="submit">Descargar y procesar Meet desde Gmail</button>
+                    <button class="btn" type="submit">Descargar CSV de Meet desde Gmail</button>
                 </form>
             </section>
 

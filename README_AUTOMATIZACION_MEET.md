@@ -52,10 +52,10 @@ Módulo alumnos → Automatización Gmail / Google Meet
 La búsqueda predeterminada es:
 
 ```text
-from:meetings-noreply@google.com subject:"Registros de la reunión" newer_than:60d
+subject:"Asistencia procesada" has:attachment newer_than:60d -label:meet_python_descargado -label:meet_python_error
 ```
 
-El sistema descarga reportes de Meet que vengan como adjunto CSV o como enlace de Google Sheets en el correo.
+El sistema prioriza los correos generados por Apps Script que llegan con CSV adjunto. Después de descargarlos correctamente, agrega en Gmail la etiqueta `meet_python_descargado` para no volver a procesar el mismo correo. Si un correo falla o no trae CSV adjunto, agrega la etiqueta `meet_python_error`.
 
 ## Uso desde terminal
 
@@ -78,8 +78,57 @@ Ambos comandos descargan los reportes nuevos desde Gmail, los guardan en `data/a
 ```env
 ALUMNOS_CURSO_OFICIAL=CURSO DE ALUMNOS
 ALUMNOS_MINUTOS_MINIMOS=30
-GMAIL_MEET_QUERY=from:meetings-noreply@google.com subject:"Registros de la reunión" newer_than:60d
+GMAIL_MEET_QUERY=subject:"Asistencia procesada" has:attachment newer_than:60d -label:meet_python_descargado -label:meet_python_error
 GMAIL_MEET_MAX_RESULTS=25
 GOOGLE_CREDENTIALS_FILE=credentials.json
 GOOGLE_TOKEN_FILE=token_gmail.json
+GMAIL_MEET_PROCESSED_LABEL=meet_python_descargado
+GMAIL_MEET_ERROR_LABEL=meet_python_error
+GMAIL_MEET_MOVE_PROCESSED_FILES=1
 ```
+
+
+## Flujo recomendado con Apps Script
+
+El descargador de Gmail ahora prioriza correos con CSV adjunto generados por Apps Script.
+
+Asuntos esperados:
+
+- `[MEET ALUMNOS] Asistencia procesada - ...` → descarga y procesa en `data/alumnos/insumos_meet/`.
+- `[MEET MAESTROS] Asistencia procesada - ...` → descarga en `data/maestros/insumos_meet/` para procesamiento posterior con horarios de cursos.
+
+Búsqueda recomendada:
+
+```text
+subject:"Asistencia procesada" has:attachment newer_than:60d
+```
+
+Por defecto ya no intenta descargar el Google Sheet original desde Drive. Esto evita errores 404 o permisos cuando los correos fueron reenviados desde otras cuentas. Si necesitas volver a activar el intento por Drive, agrega al `.env`:
+
+```text
+GMAIL_MEET_DRIVE_FALLBACK=1
+```
+
+
+## Control anti-duplicados en Gmail
+
+La descarga automática usa dos controles para no repetir archivos:
+
+1. Etiqueta en Gmail: `meet_python_descargado`.
+2. Registro local: `data/alumnos/meet_descargados.csv`.
+
+Cuando un correo se descarga correctamente, el sistema lo etiqueta en Gmail. La próxima búsqueda excluye esa etiqueta, por lo que ya no vuelve a descargar el mismo adjunto.
+
+Si un correo no trae CSV o falla, se etiqueta como `meet_python_error` para que no bloquee futuras ejecuciones. Puedes quitar esa etiqueta manualmente en Gmail si quieres volver a intentar descargarlo.
+
+Después de procesar archivos de alumnos descargados desde Gmail, los CSV se mueven a:
+
+```text
+data/alumnos/insumos_meet/procesados/
+```
+
+Así la carpeta principal de insumos queda más limpia, pero conservas respaldo histórico de los CSV.
+
+### Importante si ya autorizaste antes
+
+Esta versión necesita permiso de Gmail para modificar etiquetas. Si ya habías autorizado con la versión anterior, borra `token_gmail.json` y vuelve a ejecutar la automatización para autorizar los nuevos permisos.
