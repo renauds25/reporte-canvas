@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import csv
 import html
+import json
 import io
 import re
 import os
@@ -2053,11 +2054,35 @@ def logout():
     return redirect(url_for("admin"))
 
 
-if __name__ == "__main__":
+def ensure_runtime_directories() -> None:
     DATA_DIR.mkdir(exist_ok=True)
-    ALUMNOS_DATA_DIR.mkdir(exist_ok=True)
-    ALUMNOS_INSUMOS_DIR.mkdir(exist_ok=True)
-    MAESTROS_DATA_DIR.mkdir(exist_ok=True)
-    MAESTROS_INSUMOS_MEET_DIR.mkdir(exist_ok=True)
+    ALUMNOS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    ALUMNOS_INSUMOS_DIR.mkdir(parents=True, exist_ok=True)
+    MAESTROS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    MAESTROS_INSUMOS_MEET_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def run_actualizar_meet_cli() -> int:
+    ensure_runtime_directories()
+
+    try:
+        resultado = download_meet_reports_from_gmail()
+    except MeetAutomationError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        print(f"ERROR: No se pudo actualizar Meet: {exc}", file=sys.stderr)
+        return 1
+
+    print(json.dumps(resultado, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    comando = sys.argv[1].strip().lower() if len(sys.argv) > 1 else ""
+
+    if comando in {"actualizar-meet", "descargar-meet", "meet"}:
+        raise SystemExit(run_actualizar_meet_cli())
+
+    ensure_runtime_directories()
     app.run(debug=True)
-#jlmh 22276
