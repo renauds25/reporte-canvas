@@ -812,3 +812,23 @@ def leer_capacitaciones_reporte(tipo: str, ruta: Path = DATABASE_PATH) -> list[d
         and limpiar(fila["curso"])
         and limpiar(fila["modalidad"])
     ]
+
+
+
+def leer_ingestas_recientes(limite: int = 12, ruta: Path = DATABASE_PATH) -> list[dict[str, Any]]:
+    if not ruta.exists():
+        return []
+
+    with conectar_bd(ruta) as conexion:
+        filas = conexion.execute(
+            """
+            SELECT
+                ingesta_key, tipo, mensaje_id, recurso_id, archivo, origen, asunto,
+                fecha_reunion, fecha_descarga, estado, detalle, creado_en, actualizado_en
+            FROM ingestas
+            ORDER BY actualizado_en DESC, creado_en DESC
+            LIMIT ?
+            """,
+            (limite,),
+        ).fetchall()
+        return [dict(fila) for fila in filas]

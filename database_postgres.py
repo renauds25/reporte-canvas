@@ -743,3 +743,22 @@ def leer_capacitaciones_reporte_postgres(tipo: str) -> list[dict[str, str]]:
         and limpiar(fila["curso"])
         and limpiar(fila["modalidad"])
     ]
+
+
+
+def leer_ingestas_recientes_postgres(limite: int = 12) -> list[dict[str, Any]]:
+    engine = crear_engine_postgres()
+    with engine.connect() as conexion:
+        result = ejecutar(
+            conexion,
+            """
+            SELECT
+                ingesta_key, tipo, mensaje_id, recurso_id, archivo, origen, asunto,
+                fecha_reunion, fecha_descarga, estado, detalle, creado_en, actualizado_en
+            FROM ingestas
+            ORDER BY actualizado_en DESC, creado_en DESC
+            LIMIT :limite
+            """,
+            {"limite": limite},
+        )
+        return [dict(row._mapping) for row in result]

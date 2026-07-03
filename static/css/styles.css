@@ -1361,3 +1361,45 @@ code {
     }
 }
 
+
+/* Historial de ingestas Meet en panel admin */
+.section-heading-row {
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.admin-ingestas-table table {
+    min-width: 980px;
+}
+
+.admin-ingestas-table td,
+.admin-ingestas-table th {
+    vertical-align: top;
+}
+
+.ingesta-subject {
+    display: inline-block;
+    max-width: 360px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ingesta-error-row {
+    background: #fff7f5;
+}
+
+.admin-ingestas-table small.warning-text {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+@media (max-width: 760px) {
+    .section-heading-row {
+        flex-direction: column;
+    }
+}

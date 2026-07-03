@@ -880,7 +880,7 @@ def process_direct_meet_upload(metadata: dict[str, str], content: bytes) -> dict
             "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "estado": "procesado",
             "tipo": tipo,
-            "detalle": "CSV recibido por API privada desde Apps Script",
+            "detalle": build_ingesta_detalle_json(tipo, resultado),
         }])
 
     resultado_bd = sincronizar_bd_desde_csv()
@@ -895,6 +895,94 @@ def process_direct_meet_upload(metadata: dict[str, str], content: bytes) -> dict
         "bd": resultado_bd,
     }
 
+
+
+def build_ingesta_detalle_json(tipo: str, resultado: dict[str, Any] | None = None, error: str = "") -> str:
+    resultado = resultado or {}
+    tipo_norm = clean(tipo).lower()
+
+    if tipo_norm == "maestros":
+        conteos = {
+            "procesados": resultado.get("procesados_maestros", 0),
+            "validos": resultado.get("validos_maestros", 0),
+            "pendientes": resultado.get("pendientes_maestros", 0),
+            "descartados": resultado.get("descartados_maestros", 0),
+            "total_capacitaciones": resultado.get("total_capacitaciones_maestros", 0),
+        }
+    else:
+        conteos = {
+            "procesados": resultado.get("procesados", 0),
+            "validos": resultado.get("validos", 0),
+            "pendientes": resultado.get("pendientes", 0),
+            "descartados": resultado.get("descartados", 0),
+            "total_capacitaciones": resultado.get("total_capacitaciones", 0),
+        }
+
+    payload = {
+        "conteos": conteos,
+    }
+
+    if error:
+        payload["error"] = clean(error)
+
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def parse_ingesta_detalle(detalle: Any) -> dict[str, Any]:
+    texto = clean(detalle)
+    if not texto:
+        return {}
+
+    try:
+        parsed = json.loads(texto)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {"mensaje": texto}
+
+
+def enrich_ingesta_row(row: dict[str, Any]) -> dict[str, Any]:
+    item = {key: clean(value) for key, value in row.items()}
+    detalle = parse_ingesta_detalle(item.get("detalle", ""))
+    conteos = detalle.get("conteos", {}) if isinstance(detalle.get("conteos", {}), dict) else {}
+
+    item["procesados"] = int(float(conteos.get("procesados") or 0))
+    item["validos"] = int(float(conteos.get("validos") or 0))
+    item["pendientes"] = int(float(conteos.get("pendientes") or 0))
+    item["descartados"] = int(float(conteos.get("descartados") or 0))
+    item["error"] = clean(detalle.get("error", ""))
+    item["mensaje_detalle"] = clean(detalle.get("mensaje", ""))
+    item["es_error"] = clean(item.get("estado", "")).lower().startswith("error") or bool(item["error"])
+    return item
+
+
+def leer_ingestas_recientes_admin(limite: int = 12) -> list[dict[str, Any]]:
+    try:
+        if database_url_configurada():
+            from database_postgres import leer_ingestas_recientes_postgres
+
+            rows = leer_ingestas_recientes_postgres(limite=limite)
+        else:
+            from database import leer_ingestas_recientes
+
+            rows = leer_ingestas_recientes(limite=limite)
+
+        if rows:
+            return [enrich_ingesta_row(row) for row in rows]
+    except Exception as exc:
+        print(f"AVISO: No se pudieron leer ingestas desde BD. Usando CSV. Detalle: {exc}", file=sys.stderr)
+
+    if not ALUMNOS_MEET_PROCESADOS_PATH.exists():
+        return []
+
+    try:
+        with ALUMNOS_MEET_PROCESADOS_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+            rows = list(csv.DictReader(file))
+    except Exception as exc:
+        print(f"AVISO: No se pudo leer historial de ingestas CSV. Detalle: {exc}", file=sys.stderr)
+        return []
+
+    rows = list(reversed(rows[-limite:]))
+    return [enrich_ingesta_row(row) for row in rows]
 
 def normalize_gmail_label_name(label_name: str) -> str:
     return clean(label_name) or "meet_python_descargado"
@@ -2062,7 +2150,20 @@ def admin():
 @login_required
 def admin_panel():
     reporte = get_report_payload("maestro")
-    return render_template("admin.html", logged_in=True, error=None, reporte=reporte)
+    ingestas = leer_ingestas_recientes_admin()
+    return render_template("admin.html", logged_in=True, error=None, reporte=reporte, ingestas=ingestas)
+
+
+@app.get("/admin/api/ingestas")
+@report_login_required
+@login_required
+def admin_api_ingestas():
+    limite = request.args.get("limite", "12")
+    try:
+        limite_int = max(1, min(50, int(limite)))
+    except ValueError:
+        limite_int = 12
+    return jsonify({"ok": True, "ingestas": leer_ingestas_recientes_admin(limite_int)})
 
 
 def validate_csv_headers(path: Path, required: set[str]) -> str | None:
