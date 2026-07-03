@@ -54,6 +54,7 @@ GMAIL_MEET_DRIVE_FALLBACK = os.getenv("GMAIL_MEET_DRIVE_FALLBACK", "0").strip().
 GMAIL_MEET_PROCESSED_LABEL = os.getenv("GMAIL_MEET_PROCESSED_LABEL", "meet_python_descargado")
 GMAIL_MEET_ERROR_LABEL = os.getenv("GMAIL_MEET_ERROR_LABEL", "meet_python_error")
 GMAIL_MEET_MOVE_PROCESSED_FILES = os.getenv("GMAIL_MEET_MOVE_PROCESSED_FILES", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
+READ_REPORTS_FROM_DB = os.getenv("READ_REPORTS_FROM_DB", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
@@ -1380,6 +1381,58 @@ def read_capacitaciones(path: Path = CAPACITACIONES_PATH) -> list[dict[str, str]
     return sorted(rows, key=lambda item: parse_date(item["fecha_actualizacion"]), reverse=True)
 
 
+
+
+def database_available_for_reports() -> bool:
+    if not READ_REPORTS_FROM_DB:
+        return False
+
+    try:
+        from database import DATABASE_PATH
+        return DATABASE_PATH.exists()
+    except Exception:
+        return False
+
+
+def read_report_users(tipo: str = "maestro") -> list[dict[str, str]]:
+    if database_available_for_reports():
+        try:
+            from database import leer_usuarios_reporte
+            users = leer_usuarios_reporte(tipo)
+            if users:
+                return users
+        except Exception as exc:
+            print(f"AVISO: No se pudieron leer usuarios desde BD. Usando CSV. Detalle: {exc}", file=sys.stderr)
+
+    return read_users(ALUMNOS_USUARIOS_PATH if tipo == "alumno" else USUARIOS_PATH)
+
+
+def read_report_capacitaciones(tipo: str = "maestro") -> list[dict[str, str]]:
+    if database_available_for_reports():
+        try:
+            from database import leer_capacitaciones_reporte
+            rows = leer_capacitaciones_reporte(tipo)
+            if rows:
+                return rows
+        except Exception as exc:
+            print(f"AVISO: No se pudieron leer capacitaciones desde BD. Usando CSV. Detalle: {exc}", file=sys.stderr)
+
+    return read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH if tipo == "alumno" else CAPACITACIONES_PATH)
+
+
+def read_report_data(tipo: str = "maestro") -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    return read_report_capacitaciones(tipo), read_report_users(tipo)
+
+
+def sync_bd_safe() -> dict[str, Any]:
+    try:
+        return sincronizar_bd_desde_csv()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"No se pudo sincronizar la BD: {exc}",
+        }
+
 def build_user_indexes(users: list[dict[str, str]]) -> tuple[dict[str, dict[str, str]], dict[str, dict[str, str]], dict[str, dict[str, str]]]:
     by_id: dict[str, dict[str, str]] = {}
     by_email: dict[str, dict[str, str]] = {}
@@ -1621,17 +1674,17 @@ def index():
 @app.get("/api/reporte")
 @report_login_required
 def api_reporte():
-    rows = read_capacitaciones()
-    users = read_users()
+    rows, users = read_report_data("maestro")
     return jsonify(build_report(rows, users))
 
 
 @app.get("/api/datos")
 @report_login_required
 def api_datos():
+    rows, users = read_report_data("maestro")
     return jsonify({
-        "capacitaciones": read_capacitaciones(),
-        "usuarios": read_users(),
+        "capacitaciones": rows,
+        "usuarios": users,
     })
 
 
@@ -1648,8 +1701,7 @@ def alumnos():
 @report_login_required
 @login_required
 def api_alumnos_reporte():
-    rows = read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH)
-    users = read_users(ALUMNOS_USUARIOS_PATH)
+    rows, users = read_report_data("alumno")
     return jsonify(build_report(
         rows,
         users,
@@ -1664,9 +1716,10 @@ def api_alumnos_reporte():
 @report_login_required
 @login_required
 def api_alumnos_datos():
+    rows, users = read_report_data("alumno")
     return jsonify({
-        "capacitaciones": read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
-        "usuarios": read_users(ALUMNOS_USUARIOS_PATH),
+        "capacitaciones": rows,
+        "usuarios": users,
     })
 
 
@@ -1691,8 +1744,7 @@ def admin():
 @report_login_required
 @login_required
 def admin_panel():
-    rows = read_capacitaciones()
-    users = read_users()
+    rows, users = read_report_data("maestro")
     reporte = build_report(rows, users)
     return render_template("admin.html", logged_in=True, error=None, reporte=reporte)
 
@@ -1739,7 +1791,8 @@ def wants_json_response() -> bool:
 
 
 def admin_report_payload() -> dict[str, Any]:
-    return build_report(read_capacitaciones(), read_users())
+    rows, users = read_report_data("maestro")
+    return build_report(rows, users)
 
 
 @app.post("/admin/upload/capacitaciones")
@@ -1749,14 +1802,18 @@ def upload_capacitaciones():
     required = {"id", "nombre", "carrera", "division", "curso", "modalidad", "fecha_actualizacion"}
     error = save_uploaded_csv("archivo", CAPACITACIONES_PATH, required)
 
+    if not error:
+        resultado_bd = sync_bd_safe()
+    else:
+        resultado_bd = None
+
     if wants_json_response():
         if error:
             return jsonify({"ok": False, "error": error}), 400
-        return jsonify({"ok": True, "updated": "capacitaciones", "reporte": admin_report_payload()})
+        return jsonify({"ok": True, "updated": "capacitaciones", "bd": resultado_bd, "reporte": admin_report_payload()})
 
     if error:
-        rows = read_capacitaciones()
-        users = read_users()
+        rows, users = read_report_data("maestro")
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
     return redirect(url_for("admin_panel", updated="capacitaciones"))
 
@@ -1768,14 +1825,18 @@ def upload_usuarios():
     required = {"id", "nombre", "correo"}
     error = save_uploaded_csv("archivo", USUARIOS_PATH, required)
 
+    if not error:
+        resultado_bd = sync_bd_safe()
+    else:
+        resultado_bd = None
+
     if wants_json_response():
         if error:
             return jsonify({"ok": False, "error": error}), 400
-        return jsonify({"ok": True, "updated": "usuarios", "reporte": admin_report_payload()})
+        return jsonify({"ok": True, "updated": "usuarios", "bd": resultado_bd, "reporte": admin_report_payload()})
 
     if error:
-        rows = read_capacitaciones()
-        users = read_users()
+        rows, users = read_report_data("maestro")
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
     return redirect(url_for("admin_panel", updated="usuarios"))
 
@@ -1787,22 +1848,27 @@ def upload_alumnos_usuarios():
     required = {"id", "nombre", "correo"}
     error = save_uploaded_csv("archivo", ALUMNOS_USUARIOS_PATH, required)
 
+    if not error:
+        resultado_bd = sync_bd_safe()
+    else:
+        resultado_bd = None
+
     if wants_json_response():
         if error:
             return jsonify({"ok": False, "error": error}), 400
+        rows_alumnos, users_alumnos = read_report_data("alumno")
         reporte_alumnos = build_report(
-            read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
-            read_users(ALUMNOS_USUARIOS_PATH),
+            rows_alumnos,
+            users_alumnos,
             cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
             modalidades=ALUMNOS_MODALIDADES,
             cursos_requeridos=1,
             ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
         )
-        return jsonify({"ok": True, "updated": "alumnos_usuarios", "reporte_alumnos": reporte_alumnos})
+        return jsonify({"ok": True, "updated": "alumnos_usuarios", "bd": resultado_bd, "reporte_alumnos": reporte_alumnos})
 
     if error:
-        rows = read_capacitaciones()
-        users = read_users()
+        rows, users = read_report_data("maestro")
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
     return redirect(url_for("admin_panel", updated="alumnos_usuarios"))
 
@@ -1845,13 +1911,14 @@ def upload_alumnos_meet():
         error = "El CSV debe estar guardado en UTF-8."
         if wants_json_response():
             return jsonify({"ok": False, "error": error}), 400
-        rows = read_capacitaciones()
-        users = read_users()
+        rows, users = read_report_data("maestro")
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
 
+    resultado_bd = sync_bd_safe()
+    rows_alumnos, users_alumnos = read_report_data("alumno")
     reporte_alumnos = build_report(
-        read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
-        read_users(ALUMNOS_USUARIOS_PATH),
+        rows_alumnos,
+        users_alumnos,
         cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
         modalidades=ALUMNOS_MODALIDADES,
         cursos_requeridos=1,
@@ -1863,6 +1930,7 @@ def upload_alumnos_meet():
             "ok": True,
             "updated": "alumnos_meet",
             "resultado": resultado,
+            "bd": resultado_bd,
             "reporte_alumnos": reporte_alumnos,
         })
 
@@ -1883,15 +1951,13 @@ def descargar_meet_alumnos():
         error = str(exc)
         if wants_json_response():
             return jsonify({"ok": False, "error": error}), 400
-        rows = read_capacitaciones()
-        users = read_users()
+        rows, users = read_report_data("maestro")
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
     except Exception as exc:
         error = f"No se pudo descargar Meet desde Gmail: {exc}"
         if wants_json_response():
             return jsonify({"ok": False, "error": error}), 400
-        rows = read_capacitaciones()
-        users = read_users()
+        rows, users = read_report_data("maestro")
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
 
     try:
@@ -1902,9 +1968,10 @@ def descargar_meet_alumnos():
             "error": f"Meet se actualizó, pero no se pudo sincronizar la BD: {exc}",
         }
 
+    rows_alumnos, users_alumnos = read_report_data("alumno")
     reporte_alumnos = build_report(
-        read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH),
-        read_users(ALUMNOS_USUARIOS_PATH),
+        rows_alumnos,
+        users_alumnos,
         cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
         modalidades=ALUMNOS_MODALIDADES,
         cursos_requeridos=1,
@@ -1946,7 +2013,8 @@ def make_csv_response(filename: str, rows: list[dict[str, Any]], headers: list[s
 @report_login_required
 @login_required
 def download_sin_coincidencia():
-    reporte = build_report(read_capacitaciones(), read_users())
+    rows, users = read_report_data("maestro")
+    reporte = build_report(rows, users)
     headers = ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "coincidencia"]
     return make_csv_response("registros_sin_coincidencia.csv", reporte["registros_sin_coincidencia"], headers)
 
@@ -1955,7 +2023,8 @@ def download_sin_coincidencia():
 @report_login_required
 @login_required
 def download_sin_iniciar():
-    reporte = build_report(read_capacitaciones(), read_users())
+    rows, users = read_report_data("maestro")
+    reporte = build_report(rows, users)
     headers = ["id", "nombre", "correo"]
     return make_csv_response("usuarios_sin_iniciar.csv", reporte["usuarios_sin_iniciar_lista"], headers)
 
@@ -1964,7 +2033,8 @@ def download_sin_iniciar():
 @report_login_required
 @login_required
 def download_maestros_completos():
-    reporte = build_report(read_capacitaciones(), read_users())
+    rows, users = read_report_data("maestro")
+    reporte = build_report(rows, users)
     maestros_completos = []
 
     for persona in reporte["personas"]:

@@ -169,6 +169,13 @@ def conectar_bd(ruta: Path = DATABASE_PATH):
         conexion.close()
 
 
+
+def asegurar_columna(conexion: sqlite3.Connection, tabla: str, columna: str, definicion: str) -> None:
+    columnas = {fila[1] for fila in conexion.execute(f"PRAGMA table_info({tabla})").fetchall()}
+    if columna not in columnas:
+        conexion.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {definicion}")
+
+
 def inicializar_bd(conexion: sqlite3.Connection) -> None:
     conexion.executescript(
         """
@@ -188,6 +195,23 @@ def inicializar_bd(conexion: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_personas_tipo ON personas(tipo);
         CREATE INDEX IF NOT EXISTS idx_personas_correo ON personas(correo);
         CREATE INDEX IF NOT EXISTS idx_personas_id_externo ON personas(id_externo);
+
+        CREATE TABLE IF NOT EXISTS usuarios_base (
+            usuario_base_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo TEXT NOT NULL,
+            persona_key TEXT,
+            id_externo TEXT,
+            nombre TEXT,
+            correo TEXT,
+            carrera TEXT,
+            division TEXT,
+            creado_en TEXT NOT NULL,
+            FOREIGN KEY(persona_key) REFERENCES personas(persona_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_usuarios_base_tipo ON usuarios_base(tipo);
+        CREATE INDEX IF NOT EXISTS idx_usuarios_base_correo ON usuarios_base(correo);
+        CREATE INDEX IF NOT EXISTS idx_usuarios_base_id_externo ON usuarios_base(id_externo);
 
         CREATE TABLE IF NOT EXISTS cursos (
             curso_key TEXT PRIMARY KEY,
@@ -313,6 +337,8 @@ def inicializar_bd(conexion: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_ingestas_tipo_estado ON ingestas(tipo, estado);
         """
     )
+    asegurar_columna(conexion, "personas", "es_base", "INTEGER NOT NULL DEFAULT 0")
+    conexion.execute("CREATE INDEX IF NOT EXISTS idx_personas_tipo_es_base ON personas(tipo, es_base)")
 
 
 def reiniciar_datos(conexion: sqlite3.Connection) -> None:
@@ -323,9 +349,10 @@ def reiniciar_datos(conexion: sqlite3.Connection) -> None:
         DELETE FROM capacitaciones;
         DELETE FROM sesiones;
         DELETE FROM cursos;
+        DELETE FROM usuarios_base;
         DELETE FROM personas;
         DELETE FROM ingestas;
-        DELETE FROM sqlite_sequence WHERE name IN ('sesiones', 'pendientes_revision', 'descartados');
+        DELETE FROM sqlite_sequence WHERE name IN ('sesiones', 'pendientes_revision', 'descartados', 'usuarios_base');
         """
     )
 
@@ -339,6 +366,7 @@ def upsert_persona(
     correo: str = "",
     carrera: str = "",
     division: str = "",
+    es_base: bool = False,
 ) -> str:
     tipo = limpiar(tipo).lower()
     id_externo = limpiar(id_externo)
@@ -348,12 +376,13 @@ def upsert_persona(
     division = limpiar(division) or "No disponible"
     key = persona_key(tipo, id_externo, correo, nombre)
     ahora = fecha_hora_actual()
+    es_base_val = 1 if es_base else 0
 
     conexion.execute(
         """
         INSERT INTO personas (
-            persona_key, tipo, id_externo, nombre, correo, carrera, division, creado_en, actualizado_en
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            persona_key, tipo, id_externo, nombre, correo, carrera, division, es_base, creado_en, actualizado_en
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(persona_key) DO UPDATE SET
             id_externo = COALESCE(NULLIF(excluded.id_externo, ''), personas.id_externo),
             nombre = COALESCE(NULLIF(excluded.nombre, ''), personas.nombre),
@@ -366,9 +395,13 @@ def upsert_persona(
                 WHEN excluded.division != '' AND excluded.division != 'No disponible' THEN excluded.division
                 ELSE personas.division
             END,
+            es_base = CASE
+                WHEN excluded.es_base = 1 THEN 1
+                ELSE personas.es_base
+            END,
             actualizado_en = excluded.actualizado_en
         """,
-        (key, tipo, id_externo, nombre, correo, carrera, division, ahora, ahora),
+        (key, tipo, id_externo, nombre, correo, carrera, division, es_base_val, ahora, ahora),
     )
 
     return key
@@ -571,7 +604,7 @@ def importar_usuarios(conexion: sqlite3.Connection, ruta: Path, tipo: str) -> in
         if not any([id_externo, nombre, correo]):
             continue
 
-        upsert_persona(
+        key = upsert_persona(
             conexion,
             tipo=tipo,
             id_externo=id_externo,
@@ -579,6 +612,24 @@ def importar_usuarios(conexion: sqlite3.Connection, ruta: Path, tipo: str) -> in
             correo=correo,
             carrera=carrera,
             division=division,
+            es_base=True,
+        )
+        conexion.execute(
+            """
+            INSERT INTO usuarios_base (
+                tipo, persona_key, id_externo, nombre, correo, carrera, division, creado_en
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                limpiar(tipo).lower(),
+                key,
+                limpiar(id_externo),
+                limpiar(nombre),
+                normalizar_correo(correo),
+                limpiar(carrera) or "No disponible",
+                limpiar(division) or "No disponible",
+                fecha_hora_actual(),
+            ),
         )
         total += 1
     return total
@@ -672,6 +723,7 @@ def importar_horarios_maestros(conexion: sqlite3.Connection, ruta: Path = MAESTR
 def resumen_bd(conexion: sqlite3.Connection) -> dict[str, int]:
     tablas = [
         "personas",
+        "usuarios_base",
         "cursos",
         "sesiones",
         "capacitaciones",
@@ -683,3 +735,80 @@ def resumen_bd(conexion: sqlite3.Connection) -> dict[str, int]:
         tabla: conexion.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0]
         for tabla in tablas
     }
+
+
+def fecha_para_reporte(valor: Any) -> str:
+    texto = limpiar(valor)
+    if not texto:
+        return ""
+    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(texto, formato).strftime("%d/%m/%Y")
+        except ValueError:
+            continue
+    return texto
+
+
+def leer_usuarios_reporte(tipo: str, ruta: Path = DATABASE_PATH) -> list[dict[str, str]]:
+    if not ruta.exists():
+        return []
+
+    tipo = limpiar(tipo).lower()
+    with conectar_bd(ruta) as conexion:
+        inicializar_bd(conexion)
+        filas = conexion.execute(
+            """
+            SELECT id_externo, nombre, correo, carrera, division
+            FROM usuarios_base
+            WHERE tipo = ?
+            ORDER BY nombre COLLATE NOCASE
+            """,
+            (tipo,),
+        ).fetchall()
+
+    return [
+        {
+            "id": limpiar(fila["id_externo"]),
+            "nombre": limpiar(fila["nombre"]),
+            "correo": normalizar_correo(fila["correo"]),
+            "carrera": limpiar(fila["carrera"]) or "No disponible",
+            "division": limpiar(fila["division"]) or "No disponible",
+        }
+        for fila in filas
+        if limpiar(fila["id_externo"]) or limpiar(fila["nombre"]) or limpiar(fila["correo"])
+    ]
+
+
+def leer_capacitaciones_reporte(tipo: str, ruta: Path = DATABASE_PATH) -> list[dict[str, str]]:
+    if not ruta.exists():
+        return []
+
+    tipo = limpiar(tipo).lower()
+    with conectar_bd(ruta) as conexion:
+        inicializar_bd(conexion)
+        filas = conexion.execute(
+            """
+            SELECT id_externo, nombre, correo, carrera, division, curso, modalidad, fecha_actualizacion
+            FROM capacitaciones
+            WHERE tipo = ?
+            ORDER BY fecha_actualizacion DESC, actualizado_en DESC
+            """,
+            (tipo,),
+        ).fetchall()
+
+    return [
+        {
+            "id": limpiar(fila["id_externo"]),
+            "nombre": limpiar(fila["nombre"]),
+            "correo": normalizar_correo(fila["correo"]),
+            "carrera": limpiar(fila["carrera"]) or "No disponible",
+            "division": limpiar(fila["division"]) or "No disponible",
+            "curso": limpiar(fila["curso"]),
+            "modalidad": limpiar(fila["modalidad"]),
+            "fecha_actualizacion": fecha_para_reporte(fila["fecha_actualizacion"]),
+        }
+        for fila in filas
+        if (limpiar(fila["id_externo"]) or limpiar(fila["nombre"]) or limpiar(fila["correo"]))
+        and limpiar(fila["curso"])
+        and limpiar(fila["modalidad"])
+    ]

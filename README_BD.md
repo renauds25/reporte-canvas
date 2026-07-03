@@ -106,3 +106,40 @@ Gmail/Meet → guarde directo en BD → exporte CSV de respaldo
 ```
 
 y después que el reporte lea directamente desde la BD.
+
+
+## Lectura del reporte desde SQLite
+
+A partir de esta versión, la app intenta leer los reportes desde:
+
+```text
+data/reporte_canvas.db
+```
+
+Si la base no existe, está vacía o ocurre un error al leerla, la app vuelve automáticamente a los CSV como respaldo.
+
+Para desactivar temporalmente la lectura desde BD y forzar CSV, agrega en `.env`:
+
+```env
+READ_REPORTS_FROM_DB=0
+```
+
+Para volver a usar SQLite:
+
+```env
+READ_REPORTS_FROM_DB=1
+```
+
+Cada vez que se ejecuta:
+
+```bat
+python app.py actualizar-meet
+```
+
+el sistema actualiza los CSV y después sincroniza la BD. También puedes sincronizar solo la BD con:
+
+```bat
+python app.py sincronizar-bd
+```
+
+La tabla `usuarios_base` conserva la lista base completa de usuarios de maestros y alumnos, mientras que `personas` guarda las personas normalizadas para cruces y deduplicación interna.
