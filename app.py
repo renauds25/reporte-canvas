@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import csv
 import html
+import hmac
 import json
 import io
 import re
@@ -55,6 +56,14 @@ GMAIL_MEET_PROCESSED_LABEL = os.getenv("GMAIL_MEET_PROCESSED_LABEL", "meet_pytho
 GMAIL_MEET_ERROR_LABEL = os.getenv("GMAIL_MEET_ERROR_LABEL", "meet_python_error")
 GMAIL_MEET_MOVE_PROCESSED_FILES = os.getenv("GMAIL_MEET_MOVE_PROCESSED_FILES", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
 READ_REPORTS_FROM_DB = os.getenv("READ_REPORTS_FROM_DB", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
+REPORT_CACHE_ENABLED = os.getenv("REPORT_CACHE_ENABLED", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
+REPORT_CACHE_DIR = DATA_DIR / "cache"
+MAESTROS_REPORT_CACHE_PATH = REPORT_CACHE_DIR / "reporte_maestros.json"
+ALUMNOS_REPORT_CACHE_PATH = REPORT_CACHE_DIR / "reporte_alumnos.json"
+
+MEET_API_TOKEN = os.getenv("MEET_API_TOKEN", "").strip()
+MEET_API_DIRECT_ENABLED = os.getenv("MEET_API_DIRECT_ENABLED", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
+MEET_API_ALLOW_TOKEN_IN_BODY = os.getenv("MEET_API_ALLOW_TOKEN_IN_BODY", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
@@ -717,6 +726,174 @@ def get_meet_target_dir(tipo: str) -> Path:
 def get_meet_target_prefix(tipo: str) -> str:
     return "meet_maestros" if tipo == "maestros" else "meet_alumnos"
 
+
+def normalize_meet_tipo(value: Any, subject: str = "") -> str:
+    text_norm = norm(value)
+
+    if text_norm in {"maestro", "maestros", "docente", "docentes"}:
+        return "maestros"
+
+    if text_norm in {"alumno", "alumnos", "estudiante", "estudiantes"}:
+        return "alumnos"
+
+    return clasificar_meet_por_asunto(subject)
+
+
+def get_meet_api_token_from_request() -> str:
+    auth = clean(request.headers.get("Authorization", ""))
+    if auth.lower().startswith("bearer "):
+        return auth.split(" ", 1)[1].strip()
+
+    for header_name in ("X-Meet-Api-Token", "X-Meet-Token", "X-Api-Token"):
+        value = clean(request.headers.get(header_name, ""))
+        if value:
+            return value
+
+    if MEET_API_ALLOW_TOKEN_IN_BODY:
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+            value = clean(data.get("token", ""))
+            if value:
+                return value
+
+        value = clean(request.form.get("token", ""))
+        if value:
+            return value
+
+    return ""
+
+
+def validate_meet_api_token() -> tuple[bool, str]:
+    if not MEET_API_DIRECT_ENABLED:
+        return False, "La API directa de Meet está deshabilitada."
+
+    if not MEET_API_TOKEN:
+        return False, "Falta configurar MEET_API_TOKEN en variables de entorno."
+
+    supplied = get_meet_api_token_from_request()
+    if not supplied or not hmac.compare_digest(supplied, MEET_API_TOKEN):
+        return False, "Token no autorizado."
+
+    return True, ""
+
+
+def read_direct_meet_upload_payload() -> tuple[dict[str, str], bytes]:
+    metadata: dict[str, str] = {}
+    content: bytes = b""
+
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        metadata = {
+            "tipo": clean(data.get("tipo", "")),
+            "subject": clean(data.get("subject", data.get("asunto", ""))),
+            "filename": clean(data.get("filename", data.get("archivo", ""))),
+            "fecha_reunion": clean(data.get("fecha_reunion", data.get("fecha", ""))),
+            "curso": clean(data.get("curso", "")),
+            "ingesta_id": clean(data.get("ingesta_id", data.get("message_id", data.get("mensaje_id", "")))),
+        }
+
+        csv_base64 = clean(data.get("csv_base64", ""))
+        if csv_base64:
+            padded = csv_base64 + "=" * (-len(csv_base64) % 4)
+            content = base64.b64decode(padded.encode("utf-8"))
+        else:
+            csv_text = data.get("csv", data.get("csv_text", ""))
+            content = str(csv_text or "").encode("utf-8-sig")
+
+        return metadata, content
+
+    metadata = {
+        "tipo": clean(request.form.get("tipo", "")),
+        "subject": clean(request.form.get("subject", request.form.get("asunto", ""))),
+        "filename": clean(request.form.get("filename", request.form.get("archivo", ""))),
+        "fecha_reunion": clean(request.form.get("fecha_reunion", request.form.get("fecha", ""))),
+        "curso": clean(request.form.get("curso", "")),
+        "ingesta_id": clean(request.form.get("ingesta_id", request.form.get("message_id", request.form.get("mensaje_id", "")))),
+    }
+
+    uploaded_file = request.files.get("archivo") or request.files.get("file") or request.files.get("csv")
+    if uploaded_file and uploaded_file.filename:
+        metadata["filename"] = metadata["filename"] or uploaded_file.filename
+        content = uploaded_file.read()
+    else:
+        csv_base64 = clean(request.form.get("csv_base64", ""))
+        if csv_base64:
+            padded = csv_base64 + "=" * (-len(csv_base64) % 4)
+            content = base64.b64decode(padded.encode("utf-8"))
+        else:
+            content = str(request.form.get("csv", request.form.get("csv_text", "")) or "").encode("utf-8-sig")
+
+    return metadata, content
+
+
+def save_direct_meet_csv(tipo: str, filename: str, content: bytes) -> Path:
+    if not content:
+        raise MeetAutomationError("No se recibió contenido CSV.")
+
+    filename = filename or "asistencia_meet.csv"
+    if not filename.lower().endswith(".csv"):
+        filename = f"{Path(filename).stem or 'asistencia_meet'}.csv"
+
+    target_dir = get_meet_target_dir(tipo)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    destination = target_dir / safe_download_filename(f"api_{get_meet_target_prefix(tipo)}", filename)
+    destination.write_bytes(content)
+    return destination
+
+
+def process_direct_meet_upload(metadata: dict[str, str], content: bytes) -> dict[str, Any]:
+    subject = clean(metadata.get("subject", ""))
+    tipo = normalize_meet_tipo(metadata.get("tipo", ""), subject)
+    filename = clean(metadata.get("filename", "")) or "asistencia_meet.csv"
+    fecha_reunion = clean(metadata.get("fecha_reunion", "")) or parse_meet_subject_date(subject)
+    curso = clean(metadata.get("curso", "")) or ALUMNOS_CURSO_OFICIAL
+    ingesta_id = clean(metadata.get("ingesta_id", ""))
+
+    if ingesta_id:
+        processed_key = (f"api:{ingesta_id}", "direct_csv")
+        if processed_key in read_processed_meet_records():
+            return {
+                "ok": True,
+                "duplicado": True,
+                "tipo": tipo,
+                "ingesta_id": ingesta_id,
+                "mensaje": "Esta ingesta ya había sido procesada.",
+            }
+
+    saved_path = save_direct_meet_csv(tipo, filename, content)
+
+    if tipo == "maestros":
+        resultado = process_meet_maestros_csv_batch([(saved_path, fecha_reunion, subject or saved_path.name)])
+    else:
+        resultado = process_meet_csv_batch([(saved_path, fecha_reunion)], curso=curso)
+        if GMAIL_MEET_MOVE_PROCESSED_FILES:
+            move_files_to_processed_folder([saved_path])
+
+    if ingesta_id:
+        append_processed_meet_records([{
+            "mensaje_id": f"api:{ingesta_id}",
+            "recurso_id": "direct_csv",
+            "archivo": saved_path.name,
+            "origen": "api_directa",
+            "asunto": subject,
+            "fecha_reunion": fecha_reunion,
+            "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "estado": "procesado",
+            "tipo": tipo,
+            "detalle": "CSV recibido por API privada desde Apps Script",
+        }])
+
+    resultado_bd = sincronizar_bd_desde_csv()
+
+    return {
+        "ok": True,
+        "duplicado": False,
+        "tipo": tipo,
+        "archivo": saved_path.name,
+        "fecha_reunion": fecha_reunion,
+        "resultado": resultado,
+        "bd": resultado_bd,
+    }
 
 
 def normalize_gmail_label_name(label_name: str) -> str:
@@ -1445,6 +1622,106 @@ def read_report_data(tipo: str = "maestro") -> tuple[list[dict[str, str]], list[
     return read_report_capacitaciones(tipo), read_report_users(tipo)
 
 
+def report_cache_path(tipo: str) -> Path:
+    return ALUMNOS_REPORT_CACHE_PATH if tipo == "alumno" else MAESTROS_REPORT_CACHE_PATH
+
+
+def read_report_cache(tipo: str) -> dict[str, Any] | None:
+    if not REPORT_CACHE_ENABLED:
+        return None
+
+    path = report_cache_path(tipo)
+    if not path.exists():
+        return None
+
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            payload = json.load(file)
+    except Exception as exc:
+        print(f"AVISO: No se pudo leer cache de reporte {tipo}. Detalle: {exc}", file=sys.stderr)
+        return None
+
+    if isinstance(payload, dict) and payload.get("reporte"):
+        return payload["reporte"]
+
+    if isinstance(payload, dict):
+        return payload
+
+    return None
+
+
+def write_report_cache(tipo: str, reporte: dict[str, Any]) -> None:
+    if not REPORT_CACHE_ENABLED:
+        return
+
+    REPORT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    path = report_cache_path(tipo)
+    temp_path = path.with_suffix(".tmp")
+    payload = {
+        "tipo": tipo,
+        "generado_en": datetime.now(ZoneInfo("America/Mexico_City")).isoformat(timespec="seconds"),
+        "backend": "postgresql" if database_url_configurada() else "sqlite" if database_available_for_reports() else "csv",
+        "reporte": reporte,
+    }
+    with temp_path.open("w", encoding="utf-8") as file:
+        json.dump(payload, file, ensure_ascii=False, separators=(",", ":"))
+    temp_path.replace(path)
+
+
+def invalidate_report_cache(tipo: str | None = None) -> None:
+    paths = [report_cache_path(tipo)] if tipo else [MAESTROS_REPORT_CACHE_PATH, ALUMNOS_REPORT_CACHE_PATH]
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+        except Exception as exc:
+            print(f"AVISO: No se pudo eliminar cache {path}. Detalle: {exc}", file=sys.stderr)
+
+
+def build_report_for_tipo(tipo: str) -> dict[str, Any]:
+    rows, users = read_report_data(tipo)
+    if tipo == "alumno":
+        return build_report(
+            rows,
+            users,
+            cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
+            modalidades=ALUMNOS_MODALIDADES,
+            cursos_requeridos=1,
+            ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
+        )
+
+    return build_report(rows, users)
+
+
+def get_report_payload(tipo: str = "maestro", force_refresh: bool = False) -> dict[str, Any]:
+    if REPORT_CACHE_ENABLED and not force_refresh:
+        cached = read_report_cache(tipo)
+        if cached:
+            return cached
+
+    reporte = build_report_for_tipo(tipo)
+    write_report_cache(tipo, reporte)
+    return reporte
+
+
+def regenerate_report_cache() -> dict[str, Any]:
+    invalidate_report_cache()
+    maestros = get_report_payload("maestro", force_refresh=True)
+    alumnos = get_report_payload("alumno", force_refresh=True)
+    return {
+        "cache_enabled": REPORT_CACHE_ENABLED,
+        "maestros": {
+            "total_personas": maestros.get("total_personas", 0),
+            "total_registros": maestros.get("total_registros", 0),
+            "cache": str(MAESTROS_REPORT_CACHE_PATH),
+        },
+        "alumnos": {
+            "total_personas": alumnos.get("total_personas", 0),
+            "total_registros": alumnos.get("total_registros", 0),
+            "cache": str(ALUMNOS_REPORT_CACHE_PATH),
+        },
+    }
+
+
 def sync_bd_safe() -> dict[str, Any]:
     try:
         return sincronizar_bd_desde_csv()
@@ -1695,8 +1972,7 @@ def index():
 @app.get("/api/reporte")
 @report_login_required
 def api_reporte():
-    rows, users = read_report_data("maestro")
-    return jsonify(build_report(rows, users))
+    return jsonify(get_report_payload("maestro"))
 
 
 @app.get("/api/datos")
@@ -1722,15 +1998,7 @@ def alumnos():
 @report_login_required
 @login_required
 def api_alumnos_reporte():
-    rows, users = read_report_data("alumno")
-    return jsonify(build_report(
-        rows,
-        users,
-        cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
-        modalidades=ALUMNOS_MODALIDADES,
-        cursos_requeridos=1,
-        ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
-    ))
+    return jsonify(get_report_payload("alumno"))
 
 
 @app.get("/api/alumnos/datos")
@@ -1741,6 +2009,34 @@ def api_alumnos_datos():
     return jsonify({
         "capacitaciones": rows,
         "usuarios": users,
+    })
+
+
+@app.post("/api/meet/asistencia")
+def api_meet_asistencia_directa():
+    authorized, error = validate_meet_api_token()
+    if not authorized:
+        status_code = 503 if "Falta configurar" in error or "deshabilitada" in error else 401
+        return jsonify({"ok": False, "error": error}), status_code
+
+    try:
+        metadata, content = read_direct_meet_upload_payload()
+        resultado = process_direct_meet_upload(metadata, content)
+    except MeetAutomationError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"No se pudo procesar la asistencia: {exc}"}), 500
+
+    return jsonify(resultado)
+
+
+@app.get("/api/meet/health")
+def api_meet_health():
+    return jsonify({
+        "ok": True,
+        "api_directa_habilitada": MEET_API_DIRECT_ENABLED,
+        "token_configurado": bool(MEET_API_TOKEN),
+        "backend": "postgresql" if database_url_configurada() else "sqlite",
     })
 
 
@@ -1765,8 +2061,7 @@ def admin():
 @report_login_required
 @login_required
 def admin_panel():
-    rows, users = read_report_data("maestro")
-    reporte = build_report(rows, users)
+    reporte = get_report_payload("maestro")
     return render_template("admin.html", logged_in=True, error=None, reporte=reporte)
 
 
@@ -1812,8 +2107,7 @@ def wants_json_response() -> bool:
 
 
 def admin_report_payload() -> dict[str, Any]:
-    rows, users = read_report_data("maestro")
-    return build_report(rows, users)
+    return get_report_payload("maestro")
 
 
 @app.post("/admin/upload/capacitaciones")
@@ -1877,15 +2171,7 @@ def upload_alumnos_usuarios():
     if wants_json_response():
         if error:
             return jsonify({"ok": False, "error": error}), 400
-        rows_alumnos, users_alumnos = read_report_data("alumno")
-        reporte_alumnos = build_report(
-            rows_alumnos,
-            users_alumnos,
-            cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
-            modalidades=ALUMNOS_MODALIDADES,
-            cursos_requeridos=1,
-            ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
-        )
+        reporte_alumnos = get_report_payload("alumno")
         return jsonify({"ok": True, "updated": "alumnos_usuarios", "bd": resultado_bd, "reporte_alumnos": reporte_alumnos})
 
     if error:
@@ -1936,15 +2222,7 @@ def upload_alumnos_meet():
         return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
 
     resultado_bd = sync_bd_safe()
-    rows_alumnos, users_alumnos = read_report_data("alumno")
-    reporte_alumnos = build_report(
-        rows_alumnos,
-        users_alumnos,
-        cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
-        modalidades=ALUMNOS_MODALIDADES,
-        cursos_requeridos=1,
-        ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
-    )
+    reporte_alumnos = get_report_payload("alumno")
 
     if wants_json_response():
         return jsonify({
@@ -1989,15 +2267,7 @@ def descargar_meet_alumnos():
             "error": f"Meet se actualizó, pero no se pudo sincronizar la BD: {exc}",
         }
 
-    rows_alumnos, users_alumnos = read_report_data("alumno")
-    reporte_alumnos = build_report(
-        rows_alumnos,
-        users_alumnos,
-        cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
-        modalidades=ALUMNOS_MODALIDADES,
-        cursos_requeridos=1,
-        ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
-    )
+    reporte_alumnos = get_report_payload("alumno")
 
     if wants_json_response():
         return jsonify({
@@ -2160,6 +2430,7 @@ def ensure_runtime_directories() -> None:
     ALUMNOS_INSUMOS_DIR.mkdir(parents=True, exist_ok=True)
     MAESTROS_DATA_DIR.mkdir(parents=True, exist_ok=True)
     MAESTROS_INSUMOS_MEET_DIR.mkdir(parents=True, exist_ok=True)
+    REPORT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def sincronizar_bd_desde_csv() -> dict[str, Any]:
@@ -2175,11 +2446,20 @@ def sincronizar_bd_desde_csv() -> dict[str, Any]:
 
         destino = str(DATABASE_PATH)
 
+    try:
+        cache = regenerate_report_cache()
+    except Exception as exc:
+        cache = {
+            "cache_enabled": REPORT_CACHE_ENABLED,
+            "error": f"No se pudo regenerar cache: {exc}",
+        }
+
     return {
         "ok": True,
         "database_backend": backend,
         "database_path": destino,
         "resultado": resultado,
+        "cache": cache,
     }
 
 
@@ -2232,6 +2512,11 @@ if __name__ == "__main__":
 
     if comando in {"migrar-bd", "migrar-db", "bd", "db", "sincronizar-bd", "sync-bd", "sync-db"}:
         raise SystemExit(run_migrar_bd_cli())
+
+    if comando in {"regenerar-cache", "cache", "reporte-cache"}:
+        ensure_runtime_directories()
+        print(json.dumps(regenerate_report_cache(), ensure_ascii=False, indent=2))
+        raise SystemExit(0)
 
     ensure_runtime_directories()
     app.run(debug=True)

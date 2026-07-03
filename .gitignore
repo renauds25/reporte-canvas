@@ -8,3 +8,6 @@ token.json
 
 data/reporte_canvas.db
 *.db-journal
+
+# Cache de reportes generado en runtime
+data/cache/
