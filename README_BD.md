@@ -143,3 +143,111 @@ python app.py sincronizar-bd
 ```
 
 La tabla `usuarios_base` conserva la lista base completa de usuarios de maestros y alumnos, mientras que `personas` guarda las personas normalizadas para cruces y deduplicación interna.
+
+
+---
+
+# Modo híbrido SQLite / PostgreSQL
+
+A partir de esta versión, el proyecto puede trabajar con dos motores de base de datos:
+
+```text
+Local sin configuración extra → SQLite
+Render / producción con DATABASE_URL → PostgreSQL
+```
+
+## Cómo decide qué base usar
+
+La app revisa la variable de entorno:
+
+```env
+DATABASE_URL=
+```
+
+Si `DATABASE_URL` existe y tiene valor, usa PostgreSQL.
+
+Si `DATABASE_URL` no existe, usa SQLite local:
+
+```text
+data/reporte_canvas.db
+```
+
+## Flujo recomendado
+
+```text
+Desarrollo local:
+CSV → SQLite → reporte local
+
+Producción en Render:
+CSV / automatización Meet → PostgreSQL → reporte en Render
+```
+
+Los CSV siguen existiendo como respaldo y como fuente de sincronización.
+
+## Dependencias nuevas
+
+Se agregaron estas dependencias:
+
+```text
+SQLAlchemy
+psycopg2-binary
+```
+
+Instálalas con:
+
+```bat
+python -m pip install -r requirements.txt
+```
+
+## Probar local con SQLite
+
+Sin configurar `DATABASE_URL`, corre:
+
+```bat
+python app.py sincronizar-bd
+python app.py
+```
+
+Debe seguir usando:
+
+```text
+data/reporte_canvas.db
+```
+
+## Probar con PostgreSQL
+
+Cuando tengas una base PostgreSQL, agrega en `.env` algo como:
+
+```env
+DATABASE_URL=postgresql://usuario:password@host:puerto/base
+```
+
+También acepta URLs tipo:
+
+```env
+DATABASE_URL=postgres://usuario:password@host:puerto/base
+```
+
+El sistema las normaliza automáticamente para SQLAlchemy.
+
+Después corre:
+
+```bat
+python app.py sincronizar-bd
+```
+
+Eso creará las tablas en PostgreSQL y cargará los datos desde los CSV.
+
+## En Render
+
+En Render se debe configurar la variable de entorno:
+
+```env
+DATABASE_URL=<Internal Database URL de Render PostgreSQL>
+```
+
+La app detectará esa variable y usará PostgreSQL en lugar de SQLite.
+
+## Nota importante
+
+SQLite sigue siendo útil para pruebas locales, pero para Render conviene usar PostgreSQL porque los archivos locales del servidor pueden perderse o reiniciarse con despliegues. La base PostgreSQL persiste fuera del sistema de archivos del servicio web.

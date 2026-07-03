@@ -1383,9 +1383,16 @@ def read_capacitaciones(path: Path = CAPACITACIONES_PATH) -> list[dict[str, str]
 
 
 
+def database_url_configurada() -> bool:
+    return bool(os.getenv("DATABASE_URL", "").strip())
+
+
 def database_available_for_reports() -> bool:
     if not READ_REPORTS_FROM_DB:
         return False
+
+    if database_url_configurada():
+        return True
 
     try:
         from database import DATABASE_PATH
@@ -1397,8 +1404,15 @@ def database_available_for_reports() -> bool:
 def read_report_users(tipo: str = "maestro") -> list[dict[str, str]]:
     if database_available_for_reports():
         try:
-            from database import leer_usuarios_reporte
-            users = leer_usuarios_reporte(tipo)
+            if database_url_configurada():
+                from database_postgres import leer_usuarios_reporte_postgres
+
+                users = leer_usuarios_reporte_postgres(tipo)
+            else:
+                from database import leer_usuarios_reporte
+
+                users = leer_usuarios_reporte(tipo)
+
             if users:
                 return users
         except Exception as exc:
@@ -1410,8 +1424,15 @@ def read_report_users(tipo: str = "maestro") -> list[dict[str, str]]:
 def read_report_capacitaciones(tipo: str = "maestro") -> list[dict[str, str]]:
     if database_available_for_reports():
         try:
-            from database import leer_capacitaciones_reporte
-            rows = leer_capacitaciones_reporte(tipo)
+            if database_url_configurada():
+                from database_postgres import leer_capacitaciones_reporte_postgres
+
+                rows = leer_capacitaciones_reporte_postgres(tipo)
+            else:
+                from database import leer_capacitaciones_reporte
+
+                rows = leer_capacitaciones_reporte(tipo)
+
             if rows:
                 return rows
         except Exception as exc:
@@ -2143,12 +2164,21 @@ def ensure_runtime_directories() -> None:
 
 def sincronizar_bd_desde_csv() -> dict[str, Any]:
     from migrar_csv_a_bd import migrar_csv_a_bd
-    from database import DATABASE_PATH
 
     resultado = migrar_csv_a_bd(reiniciar=True)
+    backend = resultado.get("backend", "postgresql" if database_url_configurada() else "sqlite")
+
+    if backend == "postgresql":
+        destino = "DATABASE_URL"
+    else:
+        from database import DATABASE_PATH
+
+        destino = str(DATABASE_PATH)
+
     return {
         "ok": True,
-        "database_path": str(DATABASE_PATH),
+        "database_backend": backend,
+        "database_path": destino,
         "resultado": resultado,
     }
 
