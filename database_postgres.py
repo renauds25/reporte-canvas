@@ -41,11 +41,11 @@ def normalizar_database_url(url: str | None = None) -> str:
     if not raw:
         raise RuntimeError("DATABASE_URL no está definido.")
 
-    # Render y Heroku a veces entregan postgres://; SQLAlchemy prefiere postgresql+psycopg2://
+    # Render y Heroku a veces entregan postgres://; SQLAlchemy usará el driver Psycopg 3 con postgresql+psycopg://
     if raw.startswith("postgres://"):
-        raw = "postgresql+psycopg2://" + raw[len("postgres://"):]
+        raw = "postgresql+psycopg://" + raw[len("postgres://"):]
     elif raw.startswith("postgresql://"):
-        raw = "postgresql+psycopg2://" + raw[len("postgresql://"):]
+        raw = "postgresql+psycopg://" + raw[len("postgresql://"):]
 
     return raw
 

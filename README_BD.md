@@ -190,7 +190,7 @@ Se agregaron estas dependencias:
 
 ```text
 SQLAlchemy
-psycopg2-binary
+psycopg[binary]
 ```
 
 Instálalas con:
@@ -228,7 +228,7 @@ También acepta URLs tipo:
 DATABASE_URL=postgres://usuario:password@host:puerto/base
 ```
 
-El sistema las normaliza automáticamente para SQLAlchemy.
+El sistema las normaliza automáticamente para SQLAlchemy usando el driver `psycopg` de Psycopg 3.
 
 Después corre:
 
