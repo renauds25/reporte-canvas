@@ -61,6 +61,9 @@
                     </article>
                 </div>
                 <p class="muted">Registros sin coincidencia en base maestra: <span id="adminTotalSinCoincidencia">{{ reporte.total_registros_sin_coincidencia }}</span></p>
+                <div class="actions">
+                    <a class="btn secondary" href="{{ url_for('alumnos') }}">Abrir módulo de alumnos</a>
+                </div>
             </section>
 
             <section class="section panel admin-metrics-panel">
@@ -144,6 +147,52 @@
                 </form>
             </section>
 
+            <section class="section panel">
+                <h2>Módulo alumnos</h2>
+                <p class="muted">Mantiene el reporte de alumnos separado del reporte de maestros. La base de alumnos solo necesita: id, nombre y correo.</p>
+
+                <div class="actions">
+                    <a class="btn secondary" href="{{ url_for('alumnos') }}">Abrir reporte de alumnos</a>
+                    <a class="btn secondary" href="/admin/download/alumnos/pendientes">Descargar pendientes alumnos</a>
+                    <a class="btn secondary" href="/admin/download/alumnos/descartados">Descargar descartados alumnos</a>
+                    <a class="btn secondary" href="/admin/download/maestros/meet-pendientes">Descargar pendientes Meet maestros</a>
+                    <a class="btn secondary" href="/admin/download/maestros/meet-descartados">Descargar descartados Meet maestros</a>
+                </div>
+
+                <form method="post" action="/admin/upload/alumnos/usuarios" enctype="multipart/form-data" class="form admin-upload-form" data-upload-type="alumnos_usuarios">
+                    <label for="alumnosUsuarios">Base de alumnos CSV</label>
+                    <input id="alumnosUsuarios" name="archivo" type="file" accept=".csv" required>
+                    <button class="btn" type="submit">Actualizar base de alumnos</button>
+                </form>
+
+                <form method="post" action="/admin/upload/alumnos/meet" enctype="multipart/form-data" class="form admin-upload-form" data-upload-type="alumnos_meet">
+                    <label for="alumnosMeet">Reporte CSV de Google Meet</label>
+                    <input id="alumnosMeet" name="archivo" type="file" accept=".csv" required>
+
+                    <label for="alumnosCurso">Nombre del curso</label>
+                    <input id="alumnosCurso" name="curso" type="text" value="CURSO DE ALUMNOS" required>
+
+                    <label for="alumnosFecha">Fecha de actualización</label>
+                    <input id="alumnosFecha" name="fecha_actualizacion" type="date">
+
+                    <p class="muted small-note">Se toman Nombre, Apellido, Correo electrónico y Duración. Solo pasan alumnos con 30 minutos o más.</p>
+                    <button class="btn" type="submit">Procesar asistencia Meet</button>
+                </form>
+
+                <form method="post" action="/admin/alumnos/descargar-meet" class="form">
+                    <h3>Automatización Gmail / Google Meet</h3>
+                    <p class="muted small-note">Busca correos procesados por Apps Script, descarga los CSV adjuntos y procesa los registros nuevos. Al terminar, etiqueta los correos en Gmail como meet_python_descargado para no volver a descargarlos. Los asuntos [MEET ALUMNOS] se procesan en alumnos; [MEET MAESTROS] se procesan en maestros usando data/maestros/horarios_cursos.csv.</p>
+
+                    <label for="alumnosCursoGmail">Nombre del curso</label>
+                    <input id="alumnosCursoGmail" name="curso" type="text" value="CURSO DE ALUMNOS" required>
+
+                    <label for="alumnosMeetQuery">Búsqueda en Gmail</label>
+                    <input id="alumnosMeetQuery" name="query" type="text" value='subject:"Asistencia procesada" has:attachment newer_than:60d -label:meet_python_descargado -label:meet_python_error'>
+
+                    <button class="btn" type="submit">Descargar CSV de Meet desde Gmail</button>
+                </form>
+            </section>
+
             <form method="post" action="/admin/logout">
                 <button class="btn secondary" type="submit">Cerrar sesión</button>
             </form>
@@ -181,6 +230,9 @@
             const labels = {
                 usuarios: "Base maestra actualizada",
                 capacitaciones: "Capacitaciones actualizadas",
+                alumnos_usuarios: "Base de alumnos actualizada",
+                alumnos_meet: "Asistencia Meet de alumnos procesada",
+                alumnos_meet_gmail: "Asistencia Meet descargada desde Gmail",
                 error: "No se pudo actualizar",
             };
             const toast = document.createElement("div");
