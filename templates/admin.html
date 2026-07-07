@@ -66,65 +66,6 @@
                 </div>
             </section>
 
-            <section class="section panel admin-ingestas-panel">
-                <div class="section-heading-row">
-                    <div>
-                        <h2>Historial de actualizaciones Meet</h2>
-                        <p class="muted small-note">Últimos envíos recibidos por API directa, Gmail o cargas automáticas. Sirve para confirmar si una asistencia llegó, cuántos registros procesó y cuántos se fueron a pendientes o descartados.</p>
-                    </div>
-                    <a class="btn secondary" href="/admin/api/ingestas" target="_blank" rel="noopener">Ver JSON</a>
-                </div>
-
-                {% set historial_ingestas = ingestas if ingestas is defined else [] %}
-                {% if historial_ingestas %}
-                    <div class="table-wrap admin-ingestas-table">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Fuente</th>
-                                    <th>Tipo</th>
-                                    <th>Estado</th>
-                                    <th>Procesados</th>
-                                    <th>Válidos</th>
-                                    <th>Pendientes</th>
-                                    <th>Descartados</th>
-                                    <th>Asunto</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for ingesta in historial_ingestas %}
-                                    <tr class="{{ 'ingesta-error-row' if ingesta.es_error else '' }}">
-                                        <td>{{ ingesta.fecha_descarga or ingesta.actualizado_en or ingesta.creado_en }}</td>
-                                        <td>{{ ingesta.origen or 'No disponible' }}</td>
-                                        <td>{{ ingesta.tipo or 'No disponible' }}</td>
-                                        <td>
-                                            <span class="status {{ 'pending' if ingesta.es_error else 'complete' }}">
-                                                {{ 'ERROR' if ingesta.es_error else (ingesta.estado or 'OK') }}
-                                            </span>
-                                        </td>
-                                        <td>{{ ingesta.procesados }}</td>
-                                        <td>{{ ingesta.validos }}</td>
-                                        <td>{{ ingesta.pendientes }}</td>
-                                        <td>{{ ingesta.descartados }}</td>
-                                        <td>
-                                            <span class="ingesta-subject" title="{{ ingesta.error or ingesta.mensaje_detalle or ingesta.asunto }}">
-                                                {{ ingesta.asunto or ingesta.archivo or 'Sin asunto' }}
-                                            </span>
-                                            {% if ingesta.error %}
-                                                <small class="warning-text">{{ ingesta.error }}</small>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <p class="muted">Todavía no hay ingestas registradas. Cuando Apps Script mande datos directo a la API, aparecerán aquí.</p>
-                {% endif %}
-            </section>
-
             <section class="section panel admin-metrics-panel">
                 <h2>Avance cursos CANVAS 1 y CANVAS 2</h2>
                 {% set total_canvas_1_2 = reporte.total_usuarios_esperados or reporte.total_personas %}
@@ -250,6 +191,65 @@
 
                     <button class="btn" type="submit">Descargar CSV de Meet desde Gmail</button>
                 </form>
+            </section>
+
+            <section class="section panel admin-ingestas-panel">
+                <div class="section-heading-row">
+                    <div>
+                        <h2>Historial de actualizaciones Meet</h2>
+                        <p class="muted small-note">Últimos envíos recibidos por API directa, Gmail o cargas automáticas. Sirve para confirmar si una asistencia llegó, cuántos registros procesó y cuántos se fueron a pendientes o descartados.</p>
+                    </div>
+                    <a class="btn secondary" href="/admin/api/ingestas" target="_blank" rel="noopener">Ver JSON</a>
+                </div>
+
+                {% set historial_ingestas = ingestas if ingestas is defined else [] %}
+                {% if historial_ingestas %}
+                    <div class="table-wrap admin-ingestas-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Fuente</th>
+                                    <th>Tipo</th>
+                                    <th>Estado</th>
+                                    <th>Procesados</th>
+                                    <th>Válidos</th>
+                                    <th>Pendientes</th>
+                                    <th>Descartados</th>
+                                    <th>Asunto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ingesta in historial_ingestas %}
+                                    <tr class="{{ 'ingesta-error-row' if ingesta.es_error else '' }}">
+                                        <td>{{ ingesta.fecha_descarga or ingesta.actualizado_en or ingesta.creado_en }}</td>
+                                        <td>{{ ingesta.origen or 'No disponible' }}</td>
+                                        <td>{{ ingesta.tipo or 'No disponible' }}</td>
+                                        <td>
+                                            <span class="status {{ 'pending' if ingesta.es_error else 'complete' }}">
+                                                {{ 'ERROR' if ingesta.es_error else (ingesta.estado or 'OK') }}
+                                            </span>
+                                        </td>
+                                        <td>{{ ingesta.procesados }}</td>
+                                        <td>{{ ingesta.validos }}</td>
+                                        <td>{{ ingesta.pendientes }}</td>
+                                        <td>{{ ingesta.descartados }}</td>
+                                        <td>
+                                            <span class="ingesta-subject" title="{{ ingesta.error or ingesta.mensaje_detalle or ingesta.asunto }}">
+                                                {{ ingesta.asunto or ingesta.archivo or 'Sin asunto' }}
+                                            </span>
+                                            {% if ingesta.error %}
+                                                <small class="warning-text">{{ ingesta.error }}</small>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="muted">Todavía no hay ingestas registradas. Cuando Apps Script mande datos directo a la API, aparecerán aquí.</p>
+                {% endif %}
             </section>
 
             <form method="post" action="/admin/logout">
@@ -414,6 +414,6 @@
     </script>
     {% endif %}
 
-    <!--jlmh22276-->
+
 </body>
 </html>
