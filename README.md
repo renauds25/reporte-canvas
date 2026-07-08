@@ -32,3 +32,16 @@ python app.py sincronizar-bd
 ```
 
 Si actualizaste PostgreSQL de Render desde tu computadora, entra al panel admin publicado y usa **Regenerar cache**.
+
+## Historial de ingestas
+
+El historial visible del panel admin muestra únicamente envíos del flujo principal `api_directa`.
+Las ingestas antiguas del flujo por adjuntos CSV pueden seguir existiendo en la BD como respaldo, pero quedan ocultas en el panel para evitar confusión.
+
+Al ejecutar:
+
+```bat
+python app.py sincronizar-bd
+```
+
+la BD se reconstruye desde los CSV, pero se conservan las filas de `ingestas` con `origen = api_directa`, ya que esas provienen de Apps Script/Render y no viven en los CSV locales.

@@ -961,17 +961,24 @@ def enrich_ingesta_row(row: dict[str, Any]) -> dict[str, Any]:
 def ordenar_ingestas_admin(rows: list[dict[str, Any]], limite: int) -> list[dict[str, Any]]:
     enriquecidas = [enrich_ingesta_row(row) for row in rows]
 
-    def key(item: dict[str, Any]) -> tuple[datetime, int]:
-        fecha = parse_datetime_flexible(
+    # El panel admin está enfocado en el flujo principal actual:
+    # Apps Script -> API directa -> Render/PostgreSQL.
+    # El historial viejo de adjuntos CSV se conserva en BD como respaldo,
+    # pero no se muestra para no mezclarlo con las ingestas reales nuevas.
+    solo_api_directa = [
+        item for item in enriquecidas
+        if norm(item.get("origen")) == "api_directa"
+    ]
+
+    def key(item: dict[str, Any]) -> datetime:
+        return parse_datetime_flexible(
             item.get("fecha_descarga")
             or item.get("fecha_orden")
             or item.get("actualizado_en")
             or item.get("creado_en")
         )
-        prioridad_api = 1 if norm(item.get("origen")) == "api_directa" else 0
-        return fecha, prioridad_api
 
-    return sorted(enriquecidas, key=key, reverse=True)[:limite]
+    return sorted(solo_api_directa, key=key, reverse=True)[:limite]
 
 
 def leer_ingestas_recientes_admin(limite: int = 12) -> list[dict[str, Any]]:
@@ -986,8 +993,7 @@ def leer_ingestas_recientes_admin(limite: int = 12) -> list[dict[str, Any]]:
 
             rows = leer_ingestas_recientes(limite=limite_busqueda)
 
-        if rows:
-            return ordenar_ingestas_admin(rows, limite)
+        return ordenar_ingestas_admin(rows, limite)
     except Exception as exc:
         print(f"AVISO: No se pudieron leer ingestas desde BD. Usando CSV. Detalle: {exc}", file=sys.stderr)
 

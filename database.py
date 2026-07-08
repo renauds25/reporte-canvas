@@ -368,6 +368,12 @@ def inicializar_bd(conexion: sqlite3.Connection) -> None:
 
 
 def reiniciar_datos(conexion: sqlite3.Connection) -> None:
+    """Reinicia datos derivados de CSV sin borrar el historial de API directa.
+
+    Las ingestas con origen api_directa se generan desde Render/Apps Script y no
+    viven en los CSV, por lo que deben conservarse aunque reconstruyamos la BD
+    desde archivos locales.
+    """
     conexion.executescript(
         """
         DELETE FROM descartados;
@@ -377,7 +383,7 @@ def reiniciar_datos(conexion: sqlite3.Connection) -> None:
         DELETE FROM cursos;
         DELETE FROM usuarios_base;
         DELETE FROM personas;
-        DELETE FROM ingestas;
+        DELETE FROM ingestas WHERE LOWER(COALESCE(origen, '')) <> 'api_directa';
         DELETE FROM sqlite_sequence WHERE name IN ('sesiones', 'pendientes_revision', 'descartados', 'usuarios_base');
         """
     )
@@ -852,6 +858,7 @@ def leer_ingestas_recientes(limite: int = 12, ruta: Path = DATABASE_PATH) -> lis
                 ingesta_key, tipo, mensaje_id, recurso_id, archivo, origen, asunto,
                 fecha_reunion, fecha_descarga, estado, detalle, creado_en, actualizado_en
             FROM ingestas
+            WHERE LOWER(COALESCE(origen, '')) = 'api_directa'
             ORDER BY actualizado_en DESC, creado_en DESC
             LIMIT ?
             """,

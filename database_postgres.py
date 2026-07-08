@@ -231,6 +231,11 @@ def inicializar_postgres(conexion) -> None:
 
 
 def reiniciar_postgres(conexion) -> None:
+    """Reinicia datos derivados de CSV sin borrar ingestas de API directa.
+
+    Las filas con origen api_directa registran envíos reales de Apps Script a
+    Render. Como no existen en los CSV, se conservan al reconstruir PostgreSQL.
+    """
     ejecutar(
         conexion,
         """
@@ -241,9 +246,15 @@ def reiniciar_postgres(conexion) -> None:
             sesiones,
             cursos,
             usuarios_base,
-            personas,
-            ingestas
+            personas
         RESTART IDENTITY CASCADE
+        """,
+    )
+    ejecutar(
+        conexion,
+        """
+        DELETE FROM ingestas
+        WHERE LOWER(COALESCE(origen, '')) <> 'api_directa'
         """,
     )
 
@@ -760,6 +771,7 @@ def leer_ingestas_recientes_postgres(limite: int = 12) -> list[dict[str, Any]]:
                 ingesta_key, tipo, mensaje_id, recurso_id, archivo, origen, asunto,
                 fecha_reunion, fecha_descarga, estado, detalle, creado_en, actualizado_en
             FROM ingestas
+            WHERE LOWER(COALESCE(origen, '')) = 'api_directa'
             ORDER BY actualizado_en DESC, creado_en DESC
             LIMIT :limite
             """,
