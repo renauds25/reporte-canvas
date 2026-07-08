@@ -29,6 +29,7 @@ from database import (
     limpiar,
     normalizar,
     normalizar_correo,
+    normalizar_nombre_curso,
     obtener_valor,
     persona_key,
 )
@@ -312,7 +313,7 @@ def upsert_persona_pg(
 
 def upsert_curso_pg(conexion, *, tipo: str, nombre: str, orden: int | None = None) -> str:
     tipo = limpiar(tipo).lower()
-    nombre = limpiar(nombre)
+    nombre = normalizar_nombre_curso(tipo, nombre)
     if not nombre:
         return ""
 
@@ -493,7 +494,7 @@ def importar_usuarios_pg(conexion, ruta: Path, tipo: str) -> int:
 def importar_capacitaciones_pg(conexion, ruta: Path, tipo: str) -> int:
     total = 0
     for fila in leer_csv(ruta):
-        curso = obtener_valor(fila, "curso")
+        curso = normalizar_nombre_curso(tipo, obtener_valor(fila, "curso"))
         modalidad = obtener_valor(fila, "modalidad")
         if not curso or not modalidad:
             continue
@@ -538,7 +539,7 @@ def insertar_auxiliar_pg(conexion, tabla: str, *, tipo: str, fila: dict[str, Any
             "correo": normalizar_correo(obtener_valor(fila, "correo")),
             "carrera": obtener_valor(fila, "carrera") or "No disponible",
             "division": obtener_valor(fila, "division", "dirección", "direccion") or "No disponible",
-            "curso": obtener_valor(fila, "curso"),
+            "curso": normalizar_nombre_curso(tipo, obtener_valor(fila, "curso")),
             "modalidad": obtener_valor(fila, "modalidad"),
             "fecha_actualizacion": fecha_iso(obtener_valor(fila, "fecha_actualizacion", "fecha")),
             "duracion": obtener_valor(fila, "duracion", "duración"),
@@ -606,7 +607,7 @@ def importar_ingestas_pg(conexion, ruta: Path) -> int:
 def importar_horarios_maestros_pg(conexion, ruta: Path = MAESTROS_HORARIOS_PATH) -> int:
     total = 0
     for fila in leer_csv(ruta):
-        curso = obtener_valor(fila, "curso")
+        curso = normalizar_nombre_curso("maestro", obtener_valor(fila, "curso"))
         if not curso:
             continue
 
@@ -665,8 +666,11 @@ def migrar_csv_a_postgres(reiniciar: bool = True) -> dict[str, int]:
         if reiniciar:
             reiniciar_postgres(conexion)
 
+        cursos_base_total = importar_cursos_base_pg(conexion)
         resultado = {
-            "cursos_base": importar_cursos_base_pg(conexion),
+            "cursos_base": cursos_base_total,
+            "cursos_base_maestros": len(CURSOS_MAESTROS),
+            "cursos_base_alumnos": 1,
             "usuarios_maestros": importar_usuarios_pg(conexion, MAESTROS_USUARIOS_PATH, "maestro"),
             "usuarios_alumnos": importar_usuarios_pg(conexion, ALUMNOS_USUARIOS_PATH, "alumno"),
             "capacitaciones_maestros": importar_capacitaciones_pg(conexion, MAESTROS_CAPACITACIONES_PATH, "maestro"),

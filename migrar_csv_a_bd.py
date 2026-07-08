@@ -17,6 +17,7 @@ from database import (  # noqa: E402
     ALUMNOS_PENDIENTES_PATH,
     ALUMNOS_USUARIOS_PATH,
     DATABASE_PATH,
+    CURSOS_MAESTROS,
     MAESTROS_CAPACITACIONES_PATH,
     MAESTROS_DESCARTADOS_MEET_PATH,
     MAESTROS_PENDIENTES_MEET_PATH,
@@ -44,9 +45,12 @@ def migrar_csv_a_sqlite(reiniciar: bool = True, db_path: Path = DATABASE_PATH) -
         if reiniciar:
             reiniciar_datos(conexion)
 
+        cursos_base_total = importar_cursos_base(conexion)
         resultado = {
             "backend": "sqlite",
-            "cursos_base": importar_cursos_base(conexion),
+            "cursos_base": cursos_base_total,
+            "cursos_base_maestros": len(CURSOS_MAESTROS),
+            "cursos_base_alumnos": 1,
             "usuarios_maestros": importar_usuarios(conexion, MAESTROS_USUARIOS_PATH, "maestro"),
             "usuarios_alumnos": importar_usuarios(conexion, ALUMNOS_USUARIOS_PATH, "alumno"),
             "capacitaciones_maestros": importar_capacitaciones(conexion, MAESTROS_CAPACITACIONES_PATH, "maestro"),

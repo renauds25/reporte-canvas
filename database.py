@@ -36,6 +36,30 @@ CURSOS_MAESTROS = [
 ]
 CURSO_ALUMNOS = "CURSO DE ALUMNOS"
 
+CURSOS_MAESTROS_ALIASES = {
+    "CANVAS 5. FOROS DE DISCUSIÓN Y SPEEDGRADER.": "CANVAS 5. FOROS DE DISCUSIÓN.",
+}
+
+
+def normalizar_nombre_curso(tipo: str, curso: Any) -> str:
+    """Devuelve el nombre oficial del curso cuando detecta una variante conocida."""
+    tipo_norm = limpiar(tipo).lower()
+    curso_limpio = limpiar(curso)
+
+    if not curso_limpio:
+        return ""
+
+    if tipo_norm in {"maestro", "maestros"}:
+        mapa = {normalizar(nombre): nombre for nombre in CURSOS_MAESTROS}
+        mapa.update({normalizar(alias): oficial for alias, oficial in CURSOS_MAESTROS_ALIASES.items()})
+        return mapa.get(normalizar(curso_limpio), curso_limpio)
+
+    if tipo_norm in {"alumno", "alumnos"}:
+        if normalizar(curso_limpio) == normalizar(CURSO_ALUMNOS):
+            return CURSO_ALUMNOS
+
+    return curso_limpio
+
 
 def reparar_mojibake(valor: Any) -> str:
     texto = str(valor or "")
@@ -142,13 +166,15 @@ def persona_key(tipo: str, id_externo: Any = "", correo: Any = "", nombre: Any =
 
 
 def curso_key(tipo: str, curso: Any) -> str:
-    return f"{limpiar(tipo).lower()}|{normalizar(curso)}"
+    tipo_norm = limpiar(tipo).lower()
+    curso_oficial = normalizar_nombre_curso(tipo_norm, curso)
+    return f"{tipo_norm}|{normalizar(curso_oficial)}"
 
 
 def capacitacion_key(tipo: str, id_externo: Any, correo: Any, nombre: Any, curso: Any, modalidad: Any) -> str:
     return "|".join([
         persona_key(tipo, id_externo, correo, nombre),
-        normalizar(curso),
+        normalizar(normalizar_nombre_curso(tipo, curso)),
         normalizar(modalidad),
     ])
 
@@ -409,7 +435,7 @@ def upsert_persona(
 
 def upsert_curso(conexion: sqlite3.Connection, *, tipo: str, nombre: str, orden: int | None = None) -> str:
     tipo = limpiar(tipo).lower()
-    nombre = limpiar(nombre)
+    nombre = normalizar_nombre_curso(tipo, nombre)
     key = curso_key(tipo, nombre)
     ahora = fecha_hora_actual()
 
@@ -533,7 +559,7 @@ def insertar_auxiliar(
             normalizar_correo(obtener_valor(fila, "correo")),
             obtener_valor(fila, "carrera") or "No disponible",
             obtener_valor(fila, "division", "dirección", "direccion") or "No disponible",
-            obtener_valor(fila, "curso"),
+            normalizar_nombre_curso(tipo, obtener_valor(fila, "curso")),
             obtener_valor(fila, "modalidad"),
             fecha_iso(obtener_valor(fila, "fecha_actualizacion", "fecha")),
             obtener_valor(fila, "duracion", "duración"),
@@ -638,7 +664,7 @@ def importar_usuarios(conexion: sqlite3.Connection, ruta: Path, tipo: str) -> in
 def importar_capacitaciones(conexion: sqlite3.Connection, ruta: Path, tipo: str) -> int:
     total = 0
     for fila in leer_csv(ruta):
-        curso = obtener_valor(fila, "curso")
+        curso = normalizar_nombre_curso(tipo, obtener_valor(fila, "curso"))
         modalidad = obtener_valor(fila, "modalidad")
         if not curso or not modalidad:
             continue
@@ -690,7 +716,7 @@ def importar_cursos_base(conexion: sqlite3.Connection) -> int:
 def importar_horarios_maestros(conexion: sqlite3.Connection, ruta: Path = MAESTROS_HORARIOS_PATH) -> int:
     total = 0
     for fila in leer_csv(ruta):
-        curso = obtener_valor(fila, "curso")
+        curso = normalizar_nombre_curso("maestro", obtener_valor(fila, "curso"))
         if not curso:
             continue
         curso_id = upsert_curso(conexion, tipo="maestro", nombre=curso)

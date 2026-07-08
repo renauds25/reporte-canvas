@@ -96,7 +96,7 @@ MODALIDADES = MODALIDADES_OFICIALES
 ALUMNOS_CURSO_OFICIAL = os.getenv("ALUMNOS_CURSO_OFICIAL", "CURSO DE ALUMNOS")
 ALUMNOS_CURSOS_OFICIALES = [ALUMNOS_CURSO_OFICIAL]
 ALUMNOS_MODALIDADES = ["A distancia"]
-ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "5"))
+ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "30"))
 MAESTROS_MINUTOS_MINIMOS = int(os.getenv("MAESTROS_MINUTOS_MINIMOS", "30"))
 MAESTROS_HORARIOS_TOLERANCIA_MINUTOS = int(os.getenv("MAESTROS_HORARIOS_TOLERANCIA_MINUTOS", "15"))
 
@@ -184,6 +184,39 @@ def parse_date(value: str) -> datetime:
         except ValueError:
             continue
     return datetime.min
+
+
+def mexico_now() -> datetime:
+    return datetime.now(ZoneInfo("America/Mexico_City"))
+
+
+def mexico_now_label() -> str:
+    return mexico_now().strftime("%d/%m/%Y %H:%M")
+
+
+def parse_datetime_flexible(value: Any) -> datetime:
+    text = clean(value)
+    if not text:
+        return datetime.min
+
+    for fmt in (
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+    ):
+        try:
+            return datetime.strptime(text[:19], fmt) if "T" in fmt and len(text) > 19 else datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        return datetime.min
 
 def get_last_update_label(path: Path = CAPACITACIONES_PATH) -> str:
     if path.exists():
@@ -877,15 +910,23 @@ def process_direct_meet_upload(metadata: dict[str, str], content: bytes) -> dict
             "origen": "api_directa",
             "asunto": subject,
             "fecha_reunion": fecha_reunion,
-            "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "fecha_descarga": mexico_now_label(),
             "estado": "procesado",
             "tipo": tipo,
             "detalle": build_ingesta_detalle_json(tipo, resultado),
         }])
 
-    resultado_bd = sincronizar_bd_desde_csv()
+    try:
+        resultado_bd = sincronizar_bd_meet_api_ligero(tipo)
+        advertencia_bd = ""
+    except Exception as exc:
+        resultado_bd = {
+            "ok": False,
+            "error": f"La asistencia se procesó, pero no se pudo actualizar BD/cache: {exc}",
+        }
+        advertencia_bd = resultado_bd["error"]
 
-    return {
+    response_payload = {
         "ok": True,
         "duplicado": False,
         "tipo": tipo,
@@ -894,6 +935,10 @@ def process_direct_meet_upload(metadata: dict[str, str], content: bytes) -> dict
         "resultado": resultado,
         "bd": resultado_bd,
     }
+    if advertencia_bd:
+        response_payload["advertencia"] = advertencia_bd
+
+    return response_payload
 
 
 
@@ -952,22 +997,44 @@ def enrich_ingesta_row(row: dict[str, Any]) -> dict[str, Any]:
     item["error"] = clean(detalle.get("error", ""))
     item["mensaje_detalle"] = clean(detalle.get("mensaje", ""))
     item["es_error"] = clean(item.get("estado", "")).lower().startswith("error") or bool(item["error"])
+    item["fecha_orden"] = parse_datetime_flexible(
+        item.get("fecha_descarga")
+        or item.get("actualizado_en")
+        or item.get("creado_en")
+    ).isoformat()
     return item
 
 
+def ordenar_ingestas_admin(rows: list[dict[str, Any]], limite: int) -> list[dict[str, Any]]:
+    enriquecidas = [enrich_ingesta_row(row) for row in rows]
+
+    def key(item: dict[str, Any]) -> tuple[datetime, int]:
+        fecha = parse_datetime_flexible(
+            item.get("fecha_descarga")
+            or item.get("fecha_orden")
+            or item.get("actualizado_en")
+            or item.get("creado_en")
+        )
+        prioridad_api = 1 if norm(item.get("origen")) == "api_directa" else 0
+        return fecha, prioridad_api
+
+    return sorted(enriquecidas, key=key, reverse=True)[:limite]
+
+
 def leer_ingestas_recientes_admin(limite: int = 12) -> list[dict[str, Any]]:
+    limite_busqueda = max(limite * 5, 100)
     try:
         if database_url_configurada():
             from database_postgres import leer_ingestas_recientes_postgres
 
-            rows = leer_ingestas_recientes_postgres(limite=limite)
+            rows = leer_ingestas_recientes_postgres(limite=limite_busqueda)
         else:
             from database import leer_ingestas_recientes
 
-            rows = leer_ingestas_recientes(limite=limite)
+            rows = leer_ingestas_recientes(limite=limite_busqueda)
 
         if rows:
-            return [enrich_ingesta_row(row) for row in rows]
+            return ordenar_ingestas_admin(rows, limite)
     except Exception as exc:
         print(f"AVISO: No se pudieron leer ingestas desde BD. Usando CSV. Detalle: {exc}", file=sys.stderr)
 
@@ -981,8 +1048,7 @@ def leer_ingestas_recientes_admin(limite: int = 12) -> list[dict[str, Any]]:
         print(f"AVISO: No se pudo leer historial de ingestas CSV. Detalle: {exc}", file=sys.stderr)
         return []
 
-    rows = list(reversed(rows[-limite:]))
-    return [enrich_ingesta_row(row) for row in rows]
+    return ordenar_ingestas_admin(rows, limite)
 
 def normalize_gmail_label_name(label_name: str) -> str:
     return clean(label_name) or "meet_python_descargado"
@@ -1810,6 +1876,90 @@ def regenerate_report_cache() -> dict[str, Any]:
     }
 
 
+def regenerate_report_cache_for_tipo(tipo: str) -> dict[str, Any]:
+    tipo = "alumno" if normalize_meet_tipo(tipo) == "alumnos" or clean(tipo).lower() == "alumno" else "maestro"
+    invalidate_report_cache(tipo)
+    reporte = get_report_payload(tipo, force_refresh=True)
+    return {
+        "cache_enabled": REPORT_CACHE_ENABLED,
+        "tipo": tipo,
+        "total_personas": reporte.get("total_personas", 0),
+        "total_registros": reporte.get("total_registros", 0),
+        "cache": str(report_cache_path(tipo)),
+    }
+
+
+def sincronizar_bd_meet_api_ligero(tipo: str) -> dict[str, Any]:
+    """Sincroniza solo las tablas afectadas por una ingesta Meet directa.
+
+    Evita reconstruir toda la BD en cada llamada de Apps Script, reduciendo
+    timeouts/500 en Render. Para limpiezas manuales o cambios grandes, sigue
+    usando `python app.py sincronizar-bd`.
+    """
+    tipo_normalizado = normalize_meet_tipo(tipo)
+    tipo_db = "maestro" if tipo_normalizado == "maestros" else "alumno"
+
+    if not database_url_configurada():
+        resultado = sincronizar_bd_desde_csv()
+        resultado["modo"] = "sincronizacion_completa_sqlite"
+        return resultado
+
+    from database_postgres import (
+        crear_engine_postgres,
+        ejecutar,
+        importar_auxiliares_pg,
+        importar_capacitaciones_pg,
+        importar_ingestas_pg,
+        inicializar_postgres,
+        resumen_postgres,
+    )
+
+    if tipo_db == "maestro":
+        capacitaciones_path = CAPACITACIONES_PATH
+        pendientes_path = MAESTROS_PENDIENTES_MEET_PATH
+        descartados_path = MAESTROS_DESCARTADOS_MEET_PATH
+        cache_tipo = "maestro"
+    else:
+        capacitaciones_path = ALUMNOS_CAPACITACIONES_PATH
+        pendientes_path = ALUMNOS_PENDIENTES_PATH
+        descartados_path = ALUMNOS_DESCARTADOS_PATH
+        cache_tipo = "alumno"
+
+    engine = crear_engine_postgres()
+    with engine.begin() as conexion:
+        inicializar_postgres(conexion)
+        capacitaciones = importar_capacitaciones_pg(conexion, capacitaciones_path, tipo_db)
+
+        ejecutar(conexion, "DELETE FROM pendientes_revision WHERE tipo = :tipo", {"tipo": tipo_db})
+        ejecutar(conexion, "DELETE FROM descartados WHERE tipo = :tipo", {"tipo": tipo_db})
+
+        pendientes = importar_auxiliares_pg(conexion, pendientes_path, tipo_db, "pendientes_revision")
+        descartados = importar_auxiliares_pg(conexion, descartados_path, tipo_db, "descartados")
+        ingestas = importar_ingestas_pg(conexion, ALUMNOS_MEET_PROCESADOS_PATH)
+        resumen = resumen_postgres(conexion)
+
+    try:
+        cache = regenerate_report_cache_for_tipo(cache_tipo)
+    except Exception as exc:
+        cache = {
+            "cache_enabled": REPORT_CACHE_ENABLED,
+            "error": f"No se pudo regenerar cache {cache_tipo}: {exc}",
+        }
+
+    return {
+        "ok": True,
+        "database_backend": "postgresql",
+        "modo": "incremental_meet_api",
+        "tipo": tipo_db,
+        "capacitaciones_importadas": capacitaciones,
+        "pendientes_importados": pendientes,
+        "descartados_importados": descartados,
+        "ingestas_importadas": ingestas,
+        "tablas": resumen,
+        "cache": cache,
+    }
+
+
 def sync_bd_safe() -> dict[str, Any]:
     try:
         return sincronizar_bd_desde_csv()
@@ -2152,6 +2302,31 @@ def admin_panel():
     reporte = get_report_payload("maestro")
     ingestas = leer_ingestas_recientes_admin()
     return render_template("admin.html", logged_in=True, error=None, reporte=reporte, ingestas=ingestas)
+
+
+@app.post("/admin/cache/regenerar")
+@report_login_required
+@login_required
+def admin_regenerar_cache():
+    try:
+        cache = regenerate_report_cache()
+        ok = True
+        error = ""
+    except Exception as exc:
+        cache = {}
+        ok = False
+        error = f"No se pudo regenerar cache: {exc}"
+
+    if wants_json_response():
+        status = 200 if ok else 500
+        return jsonify({"ok": ok, "cache": cache, "error": error}), status
+
+    if not ok:
+        reporte = get_report_payload("maestro")
+        ingestas = leer_ingestas_recientes_admin()
+        return render_template("admin.html", logged_in=True, error=error, reporte=reporte, ingestas=ingestas)
+
+    return redirect(url_for("admin_panel", updated="cache"))
 
 
 @app.get("/admin/api/ingestas")
