@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import csv
-import html
 import hmac
 import json
 import io
@@ -44,17 +43,7 @@ MAESTROS_HORARIOS_PATH = MAESTROS_DATA_DIR / "horarios_cursos.csv"
 MAESTROS_PENDIENTES_MEET_PATH = MAESTROS_DATA_DIR / "pendientes_revision_meet.csv"
 MAESTROS_DESCARTADOS_MEET_PATH = MAESTROS_DATA_DIR / "descartados_menos_30_min_meet.csv"
 
-GOOGLE_CREDENTIALS_PATH = BASE_DIR / os.getenv("GOOGLE_CREDENTIALS_FILE", "credentials.json")
-GOOGLE_TOKEN_PATH = BASE_DIR / os.getenv("GOOGLE_TOKEN_FILE", "token_gmail.json")
-GMAIL_MEET_QUERY = os.getenv(
-    "GMAIL_MEET_QUERY",
-    'subject:"Asistencia procesada" has:attachment newer_than:60d',
-)
-GMAIL_MEET_MAX_RESULTS = int(os.getenv("GMAIL_MEET_MAX_RESULTS", "25"))
-GMAIL_MEET_DRIVE_FALLBACK = os.getenv("GMAIL_MEET_DRIVE_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "si", "sí"}
-GMAIL_MEET_PROCESSED_LABEL = os.getenv("GMAIL_MEET_PROCESSED_LABEL", "meet_python_descargado")
-GMAIL_MEET_ERROR_LABEL = os.getenv("GMAIL_MEET_ERROR_LABEL", "meet_python_error")
-GMAIL_MEET_MOVE_PROCESSED_FILES = os.getenv("GMAIL_MEET_MOVE_PROCESSED_FILES", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
+MEET_API_MOVE_PROCESSED_FILES = os.getenv("MEET_API_MOVE_PROCESSED_FILES", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
 READ_REPORTS_FROM_DB = os.getenv("READ_REPORTS_FROM_DB", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
 REPORT_CACHE_ENABLED = os.getenv("REPORT_CACHE_ENABLED", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
 REPORT_CACHE_DIR = DATA_DIR / "cache"
@@ -422,48 +411,12 @@ def append_processed_meet_records(rows: list[dict[str, Any]]) -> None:
             writer.writerow({header: row.get(header, "") for header in headers})
 
 
-def extract_message_header(message: dict[str, Any], header_name: str) -> str:
-    headers = message.get("payload", {}).get("headers", [])
-    for header in headers:
-        if clean(header.get("name", "")).lower() == header_name.lower():
-            return clean(header.get("value", ""))
-    return ""
 
 
-def decode_gmail_body(data: str) -> str:
-    if not data:
-        return ""
-    padded = data + "=" * (-len(data) % 4)
-    try:
-        return base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8", errors="replace")
-    except Exception:
-        return ""
 
 
-def iter_gmail_parts(payload: dict[str, Any]):
-    yield payload
-    for part in payload.get("parts", []) or []:
-        yield from iter_gmail_parts(part)
 
 
-def extract_spreadsheet_ids_from_message(message: dict[str, Any]) -> list[str]:
-    combined_text = []
-    for part in iter_gmail_parts(message.get("payload", {})):
-        mime_type = part.get("mimeType", "")
-        body_data = part.get("body", {}).get("data", "")
-        if body_data and mime_type in {"text/html", "text/plain"}:
-            combined_text.append(decode_gmail_body(body_data))
-
-    text = html.unescape("\n".join(combined_text))
-    ids = re.findall(r"https://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]+)", text)
-
-    unique_ids = []
-    seen = set()
-    for spreadsheet_id in ids:
-        if spreadsheet_id not in seen:
-            seen.add(spreadsheet_id)
-            unique_ids.append(spreadsheet_id)
-    return unique_ids
 
 
 def parse_meet_subject_date(subject: str, fallback_timestamp_ms: str | None = None) -> str:
@@ -899,7 +852,7 @@ def process_direct_meet_upload(metadata: dict[str, str], content: bytes) -> dict
         resultado = process_meet_maestros_csv_batch([(saved_path, fecha_reunion, subject or saved_path.name)])
     else:
         resultado = process_meet_csv_batch([(saved_path, fecha_reunion)], curso=curso)
-        if GMAIL_MEET_MOVE_PROCESSED_FILES:
+        if MEET_API_MOVE_PROCESSED_FILES:
             move_files_to_processed_folder([saved_path])
 
     if ingesta_id:
@@ -1050,56 +1003,12 @@ def leer_ingestas_recientes_admin(limite: int = 12) -> list[dict[str, Any]]:
 
     return ordenar_ingestas_admin(rows, limite)
 
-def normalize_gmail_label_name(label_name: str) -> str:
-    return clean(label_name) or "meet_python_descargado"
 
 
-def ensure_gmail_query_excludes_labels(query: str, label_names: list[str]) -> str:
-    query = clean(query)
-    query_norm = norm(query)
-
-    for label_name in label_names:
-        label_name = normalize_gmail_label_name(label_name)
-        label_token = f"label:{label_name}"
-        negative_label_token = f"-label:{label_name}"
-
-        if norm(label_token) in query_norm or norm(negative_label_token) in query_norm:
-            continue
-
-        query = f"{query} -label:{label_name}".strip()
-
-    return query
 
 
-def get_or_create_gmail_label(gmail_service, label_name: str) -> str:
-    label_name = normalize_gmail_label_name(label_name)
-
-    labels_response = gmail_service.users().labels().list(userId="me").execute()
-    for label in labels_response.get("labels", []):
-        if clean(label.get("name", "")).lower() == label_name.lower():
-            return label.get("id", "")
-
-    created = gmail_service.users().labels().create(
-        userId="me",
-        body={
-            "name": label_name,
-            "labelListVisibility": "labelShow",
-            "messageListVisibility": "show",
-        },
-    ).execute()
-
-    return created.get("id", "")
 
 
-def add_gmail_label_to_message(gmail_service, message_id: str, label_id: str) -> None:
-    if not message_id or not label_id:
-        return
-
-    gmail_service.users().messages().modify(
-        userId="me",
-        id=message_id,
-        body={"addLabelIds": [label_id]},
-    ).execute()
 
 
 def move_files_to_processed_folder(files: list[Path], folder_name: str = "procesados") -> list[Path]:
@@ -1127,314 +1036,10 @@ def move_files_to_processed_folder(files: list[Path], folder_name: str = "proces
     return moved
 
 
-def get_google_services():
-    try:
-        from google.auth.transport.requests import Request
-        from google.oauth2.credentials import Credentials
-        from google_auth_oauthlib.flow import InstalledAppFlow
-        from googleapiclient.discovery import build
-    except ImportError as exc:
-        raise MeetAutomationError(
-            "Faltan dependencias de Google. Instala con: python -m pip install -r requirements.txt"
-        ) from exc
-
-    scopes = [
-        "https://www.googleapis.com/auth/gmail.modify",
-        "https://www.googleapis.com/auth/drive.readonly",
-    ]
-
-    if not GOOGLE_CREDENTIALS_PATH.exists():
-        raise MeetAutomationError(
-            f"No encontré {GOOGLE_CREDENTIALS_PATH.name}. Descarga el OAuth Client de Google Cloud "
-            "y guárdalo en la raíz del proyecto."
-        )
-
-    creds = None
-    if GOOGLE_TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(GOOGLE_TOKEN_PATH), scopes)
-        if hasattr(creds, "has_scopes") and not creds.has_scopes(scopes):
-            creds = None
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(str(GOOGLE_CREDENTIALS_PATH), scopes)
-            creds = flow.run_local_server(port=0)
-
-        GOOGLE_TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
-
-    gmail_service = build("gmail", "v1", credentials=creds)
-    drive_service = build("drive", "v3", credentials=creds)
-    return gmail_service, drive_service
 
 
-def download_google_sheet_as_csv(drive_service, spreadsheet_id: str, destination: Path) -> None:
-    try:
-        from googleapiclient.http import MediaIoBaseDownload
-    except ImportError as exc:
-        raise MeetAutomationError(
-            "Faltan dependencias de Google. Instala con: python -m pip install -r requirements.txt"
-        ) from exc
-
-    request_media = drive_service.files().export_media(
-        fileId=spreadsheet_id,
-        mimeType="text/csv",
-    )
-    buffer = io.BytesIO()
-    downloader = MediaIoBaseDownload(buffer, request_media)
-
-    done = False
-    while not done:
-        _, done = downloader.next_chunk()
-
-    destination.write_bytes(buffer.getvalue())
 
 
-def download_meet_reports_from_gmail(
-    curso: str | None = None,
-    query: str | None = None,
-    max_results: int | None = None,
-) -> dict[str, Any]:
-    gmail_service, drive_service = get_google_services()
-    curso = clean(curso) or ALUMNOS_CURSO_OFICIAL
-    query = ensure_gmail_query_excludes_labels(
-        query or GMAIL_MEET_QUERY,
-        [GMAIL_MEET_PROCESSED_LABEL, GMAIL_MEET_ERROR_LABEL],
-    )
-    max_results = max_results or GMAIL_MEET_MAX_RESULTS
-
-    processed_label_id = get_or_create_gmail_label(gmail_service, GMAIL_MEET_PROCESSED_LABEL)
-    error_label_id = get_or_create_gmail_label(gmail_service, GMAIL_MEET_ERROR_LABEL)
-
-    processed = read_processed_meet_records()
-    downloaded_alumnos_files: list[tuple[Path, str]] = []
-    downloaded_maestros_files: list[tuple[Path, str, str]] = []
-    processed_rows: list[dict[str, Any]] = []
-    skipped = 0
-    sin_csv = 0
-    errores_drive = 0
-    correos_etiquetados = 0
-    correos_error = 0
-    archivos_movidos = 0
-
-    response = gmail_service.users().messages().list(
-        userId="me",
-        q=query,
-        maxResults=max_results,
-    ).execute()
-
-    messages = response.get("messages", [])
-    ALUMNOS_INSUMOS_DIR.mkdir(parents=True, exist_ok=True)
-    MAESTROS_INSUMOS_MEET_DIR.mkdir(parents=True, exist_ok=True)
-
-    for message_summary in messages:
-        message_id = message_summary.get("id", "")
-        if not message_id:
-            continue
-
-        message = gmail_service.users().messages().get(
-            userId="me",
-            id=message_id,
-            format="full",
-        ).execute()
-
-        subject = extract_message_header(message, "Subject")
-        fecha_reunion = parse_meet_subject_date(subject, message.get("internalDate"))
-        tipo = clasificar_meet_por_asunto(subject)
-        target_dir = get_meet_target_dir(tipo)
-        target_prefix = get_meet_target_prefix(tipo)
-        csv_downloaded_for_message = 0
-        message_has_error = False
-
-        for part in iter_gmail_parts(message.get("payload", {})):
-            filename = clean(part.get("filename"))
-            attachment_id = part.get("body", {}).get("attachmentId")
-
-            if not filename or not attachment_id or not filename.lower().endswith(".csv"):
-                continue
-
-            resource_id = f"attachment:{attachment_id}"
-            if (message_id, resource_id) in processed:
-                skipped += 1
-                continue
-
-            try:
-                attachment = gmail_service.users().messages().attachments().get(
-                    userId="me",
-                    messageId=message_id,
-                    id=attachment_id,
-                ).execute()
-
-                data = attachment.get("data", "")
-                padded = data + "=" * (-len(data) % 4)
-                content = base64.urlsafe_b64decode(padded.encode("utf-8"))
-
-                destination = target_dir / safe_download_filename(target_prefix, filename)
-                destination.write_bytes(content)
-                csv_downloaded_for_message += 1
-
-                if tipo == "alumnos":
-                    downloaded_alumnos_files.append((destination, fecha_reunion))
-                else:
-                    downloaded_maestros_files.append((destination, fecha_reunion, subject))
-
-                processed_rows.append({
-                    "mensaje_id": message_id,
-                    "recurso_id": resource_id,
-                    "archivo": destination.name,
-                    "origen": "adjunto_csv",
-                    "asunto": subject,
-                    "fecha_reunion": fecha_reunion,
-                    "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "estado": "descargado",
-                    "tipo": tipo,
-                    "detalle": "CSV adjunto descargado",
-                })
-            except Exception as exc:
-                message_has_error = True
-                processed_rows.append({
-                    "mensaje_id": message_id,
-                    "recurso_id": resource_id,
-                    "archivo": "",
-                    "origen": "adjunto_csv",
-                    "asunto": subject,
-                    "fecha_reunion": fecha_reunion,
-                    "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "estado": "error_adjunto",
-                    "tipo": tipo,
-                    "detalle": str(exc),
-                })
-
-        if csv_downloaded_for_message > 0 and not message_has_error:
-            add_gmail_label_to_message(gmail_service, message_id, processed_label_id)
-            correos_etiquetados += 1
-            continue
-
-        if csv_downloaded_for_message > 0 and message_has_error:
-            add_gmail_label_to_message(gmail_service, message_id, error_label_id)
-            correos_error += 1
-            continue
-
-        if not GMAIL_MEET_DRIVE_FALLBACK:
-            sin_csv += 1
-            processed_rows.append({
-                "mensaje_id": message_id,
-                "recurso_id": "sin_csv_adjunto",
-                "archivo": "",
-                "origen": "correo",
-                "asunto": subject,
-                "fecha_reunion": fecha_reunion,
-                "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "estado": "omitido",
-                "tipo": tipo,
-                "detalle": "El correo no tenía CSV adjunto. Se omitió Drive para evitar errores de permisos.",
-            })
-            add_gmail_label_to_message(gmail_service, message_id, error_label_id)
-            correos_error += 1
-            continue
-
-        sheets_downloaded_for_message = 0
-        for spreadsheet_id in extract_spreadsheet_ids_from_message(message):
-            resource_id = f"sheet:{spreadsheet_id}"
-            if (message_id, resource_id) in processed:
-                skipped += 1
-                continue
-
-            destination = target_dir / safe_download_filename(target_prefix, f"meet_{spreadsheet_id}.csv")
-            try:
-                download_google_sheet_as_csv(drive_service, spreadsheet_id, destination)
-            except Exception as exc:
-                errores_drive += 1
-                message_has_error = True
-                processed_rows.append({
-                    "mensaje_id": message_id,
-                    "recurso_id": resource_id,
-                    "archivo": "",
-                    "origen": "google_sheet",
-                    "asunto": subject,
-                    "fecha_reunion": fecha_reunion,
-                    "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "estado": "error_drive",
-                    "tipo": tipo,
-                    "detalle": str(exc),
-                })
-                continue
-
-            sheets_downloaded_for_message += 1
-            if tipo == "alumnos":
-                downloaded_alumnos_files.append((destination, fecha_reunion))
-            else:
-                downloaded_maestros_files.append((destination, fecha_reunion, subject))
-
-            processed_rows.append({
-                "mensaje_id": message_id,
-                "recurso_id": resource_id,
-                "archivo": destination.name,
-                "origen": "google_sheet",
-                "asunto": subject,
-                "fecha_reunion": fecha_reunion,
-                "fecha_descarga": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "estado": "descargado",
-                "tipo": tipo,
-                "detalle": "Google Sheet exportado a CSV",
-            })
-
-        if sheets_downloaded_for_message > 0 and not message_has_error:
-            add_gmail_label_to_message(gmail_service, message_id, processed_label_id)
-            correos_etiquetados += 1
-        elif message_has_error:
-            add_gmail_label_to_message(gmail_service, message_id, error_label_id)
-            correos_error += 1
-
-    append_processed_meet_records(processed_rows)
-
-    resultado_proceso = process_meet_csv_batch(
-        downloaded_alumnos_files,
-        curso=curso,
-    ) if downloaded_alumnos_files else {
-        "procesados": 0,
-        "validos": 0,
-        "pendientes": 0,
-        "descartados": 0,
-        "total_capacitaciones": len(read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH)),
-    }
-
-    archivos_maestros_pendientes = [
-        (path, parse_meet_subject_date(path.name), path.name)
-        for path in MAESTROS_INSUMOS_MEET_DIR.glob("*.csv")
-        if path.is_file() and path.parent.name != "procesados"
-    ]
-    maestros_source_files = downloaded_maestros_files + [
-        item for item in archivos_maestros_pendientes if item[0] not in {downloaded[0] for downloaded in downloaded_maestros_files}
-    ]
-
-    resultado_maestros = process_meet_maestros_csv_batch(maestros_source_files) if maestros_source_files else {
-        "procesados_maestros": 0,
-        "validos_maestros": 0,
-        "pendientes_maestros": 0,
-        "descartados_maestros": 0,
-        "total_capacitaciones_maestros": len(read_capacitaciones(CAPACITACIONES_PATH)),
-    }
-
-    if GMAIL_MEET_MOVE_PROCESSED_FILES and downloaded_alumnos_files:
-        moved_files = move_files_to_processed_folder([path for path, _ in downloaded_alumnos_files])
-        archivos_movidos = len(moved_files)
-
-    return {
-        "correos_encontrados": len(messages),
-        "archivos_descargados": len(downloaded_alumnos_files) + len(downloaded_maestros_files),
-        "archivos_alumnos_descargados": len(downloaded_alumnos_files),
-        "archivos_maestros_descargados": len(downloaded_maestros_files),
-        "archivos_alumnos_movidos_a_procesados": archivos_movidos,
-        "correos_etiquetados_procesados": correos_etiquetados,
-        "correos_etiquetados_error": correos_error,
-        "correos_sin_csv_adjunto": sin_csv,
-        "errores_drive": errores_drive,
-        "omitidos_por_duplicado": skipped,
-        **resultado_proceso,
-        **resultado_maestros,
-    }
 
 
 def process_meet_csv_batch(
@@ -1660,7 +1265,7 @@ def process_meet_maestros_csv_batch(
     write_csv(MAESTROS_PENDIENTES_MEET_PATH, pendientes, maestro_aux_headers)
     write_csv(MAESTROS_DESCARTADOS_MEET_PATH, descartados, maestro_aux_headers)
 
-    if GMAIL_MEET_MOVE_PROCESSED_FILES and processed_paths:
+    if MEET_API_MOVE_PROCESSED_FILES and processed_paths:
         move_files_to_processed_folder(processed_paths)
 
     return {
@@ -2341,221 +1946,25 @@ def admin_api_ingestas():
     return jsonify({"ok": True, "ingestas": leer_ingestas_recientes_admin(limite_int)})
 
 
-def validate_csv_headers(path: Path, required: set[str]) -> str | None:
-    try:
-        with path.open("r", encoding="utf-8-sig", newline="") as file:
-            reader = csv.DictReader(file)
-            headers = {norm(header) for header in (reader.fieldnames or [])}
-            missing = {header for header in required if norm(header) not in headers}
-            if missing:
-                return f"Faltan columnas en el CSV: {', '.join(sorted(missing))}"
-    except UnicodeDecodeError:
-        return "El CSV debe estar guardado en UTF-8."
-    return None
 
 
-def save_uploaded_csv(field_name: str, destination: Path, required_headers: set[str]) -> str | None:
-    if field_name not in request.files:
-        return "No se recibió ningún archivo."
-
-    archivo = request.files[field_name]
-    if not archivo.filename:
-        return "Selecciona un archivo CSV."
-
-    if not allowed_file(archivo.filename):
-        return "Solo se permiten archivos .csv."
-
-    filename = secure_filename(archivo.filename)
-    temp_path = DATA_DIR / f"temp_{filename}"
-    archivo.save(temp_path)
-
-    error = validate_csv_headers(temp_path, required_headers)
-    if error:
-        temp_path.unlink(missing_ok=True)
-        return error
-
-    temp_path.replace(destination)
-    return None
 
 
 def wants_json_response() -> bool:
     return request.headers.get("X-Requested-With") == "fetch" or "application/json" in request.headers.get("Accept", "")
 
 
-def admin_report_payload() -> dict[str, Any]:
-    return get_report_payload("maestro")
-
-
-@app.post("/admin/upload/capacitaciones")
-@report_login_required
-@login_required
-def upload_capacitaciones():
-    required = {"id", "nombre", "carrera", "division", "curso", "modalidad", "fecha_actualizacion"}
-    error = save_uploaded_csv("archivo", CAPACITACIONES_PATH, required)
-
-    if not error:
-        resultado_bd = sync_bd_safe()
-    else:
-        resultado_bd = None
-
-    if wants_json_response():
-        if error:
-            return jsonify({"ok": False, "error": error}), 400
-        return jsonify({"ok": True, "updated": "capacitaciones", "bd": resultado_bd, "reporte": admin_report_payload()})
-
-    if error:
-        rows, users = read_report_data("maestro")
-        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
-    return redirect(url_for("admin_panel", updated="capacitaciones"))
-
-
-@app.post("/admin/upload/usuarios")
-@report_login_required
-@login_required
-def upload_usuarios():
-    required = {"id", "nombre", "correo"}
-    error = save_uploaded_csv("archivo", USUARIOS_PATH, required)
-
-    if not error:
-        resultado_bd = sync_bd_safe()
-    else:
-        resultado_bd = None
-
-    if wants_json_response():
-        if error:
-            return jsonify({"ok": False, "error": error}), 400
-        return jsonify({"ok": True, "updated": "usuarios", "bd": resultado_bd, "reporte": admin_report_payload()})
-
-    if error:
-        rows, users = read_report_data("maestro")
-        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
-    return redirect(url_for("admin_panel", updated="usuarios"))
-
-
-@app.post("/admin/upload/alumnos/usuarios")
-@report_login_required
-@login_required
-def upload_alumnos_usuarios():
-    required = {"id", "nombre", "correo"}
-    error = save_uploaded_csv("archivo", ALUMNOS_USUARIOS_PATH, required)
-
-    if not error:
-        resultado_bd = sync_bd_safe()
-    else:
-        resultado_bd = None
-
-    if wants_json_response():
-        if error:
-            return jsonify({"ok": False, "error": error}), 400
-        reporte_alumnos = get_report_payload("alumno")
-        return jsonify({"ok": True, "updated": "alumnos_usuarios", "bd": resultado_bd, "reporte_alumnos": reporte_alumnos})
-
-    if error:
-        rows, users = read_report_data("maestro")
-        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
-    return redirect(url_for("admin_panel", updated="alumnos_usuarios"))
-
-
-@app.post("/admin/upload/alumnos/meet")
-@report_login_required
-@login_required
-def upload_alumnos_meet():
-    if "archivo" not in request.files:
-        error = "No se recibió ningún archivo."
-        if wants_json_response():
-            return jsonify({"ok": False, "error": error}), 400
-        return redirect(url_for("admin_panel"))
-
-    archivo = request.files["archivo"]
-    if not archivo.filename:
-        error = "Selecciona un archivo CSV de Meet."
-        if wants_json_response():
-            return jsonify({"ok": False, "error": error}), 400
-        return redirect(url_for("admin_panel"))
-
-    if not allowed_file(archivo.filename):
-        error = "Solo se permiten archivos .csv."
-        if wants_json_response():
-            return jsonify({"ok": False, "error": error}), 400
-        return redirect(url_for("admin_panel"))
-
-    ALUMNOS_INSUMOS_DIR.mkdir(parents=True, exist_ok=True)
-    filename = secure_filename(archivo.filename)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    saved_path = ALUMNOS_INSUMOS_DIR / f"{timestamp}_{filename}"
-    archivo.save(saved_path)
-
-    curso = clean(request.form.get("curso")) or ALUMNOS_CURSO_OFICIAL
-    fecha_actualizacion = clean(request.form.get("fecha_actualizacion"))
-
-    try:
-        resultado = process_meet_csv(saved_path, curso=curso, fecha_actualizacion=fecha_actualizacion)
-    except UnicodeDecodeError:
-        error = "El CSV debe estar guardado en UTF-8."
-        if wants_json_response():
-            return jsonify({"ok": False, "error": error}), 400
-        rows, users = read_report_data("maestro")
-        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
-
-    resultado_bd = sync_bd_safe()
-    reporte_alumnos = get_report_payload("alumno")
-
-    if wants_json_response():
-        return jsonify({
-            "ok": True,
-            "updated": "alumnos_meet",
-            "resultado": resultado,
-            "bd": resultado_bd,
-            "reporte_alumnos": reporte_alumnos,
-        })
-
-    return redirect(url_for("admin_panel", updated="alumnos_meet"))
 
 
 
-@app.post("/admin/alumnos/descargar-meet")
-@report_login_required
-@login_required
-def descargar_meet_alumnos():
-    curso = clean(request.form.get("curso")) or ALUMNOS_CURSO_OFICIAL
-    query = clean(request.form.get("query")) or GMAIL_MEET_QUERY
 
-    try:
-        resultado = download_meet_reports_from_gmail(curso=curso, query=query)
-    except MeetAutomationError as exc:
-        error = str(exc)
-        if wants_json_response():
-            return jsonify({"ok": False, "error": error}), 400
-        rows, users = read_report_data("maestro")
-        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
-    except Exception as exc:
-        error = f"No se pudo descargar Meet desde Gmail: {exc}"
-        if wants_json_response():
-            return jsonify({"ok": False, "error": error}), 400
-        rows, users = read_report_data("maestro")
-        return render_template("admin.html", logged_in=True, error=error, reporte=build_report(rows, users))
 
-    try:
-        resultado_bd = sincronizar_bd_desde_csv()
-    except Exception as exc:
-        resultado_bd = {
-            "ok": False,
-            "error": f"Meet se actualizó, pero no se pudo sincronizar la BD: {exc}",
-        }
 
-    reporte_alumnos = get_report_payload("alumno")
 
-    if wants_json_response():
-        return jsonify({
-            "ok": True,
-            "updated": "alumnos_meet_gmail",
-            "resultado": resultado,
-            "bd": resultado_bd,
-            "reporte": admin_report_payload(),
-            "reporte_alumnos": reporte_alumnos,
-        })
 
-    return redirect(url_for("admin_panel", updated="alumnos_meet_gmail"))
+
+
+
 
 def make_csv_response(filename: str, rows: list[dict[str, Any]], headers: list[str]) -> Response:
     output = []
@@ -2739,31 +2148,6 @@ def sincronizar_bd_desde_csv() -> dict[str, Any]:
     }
 
 
-def run_actualizar_meet_cli() -> int:
-    ensure_runtime_directories()
-
-    try:
-        resultado = download_meet_reports_from_gmail()
-    except MeetAutomationError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-    except Exception as exc:
-        print(f"ERROR: No se pudo actualizar Meet: {exc}", file=sys.stderr)
-        return 1
-
-    try:
-        resultado_bd = sincronizar_bd_desde_csv()
-    except Exception as exc:
-        print(json.dumps(resultado, ensure_ascii=False, indent=2))
-        print(f"ERROR: Meet se actualizó, pero no se pudo sincronizar la BD: {exc}", file=sys.stderr)
-        return 1
-
-    salida = {
-        "meet": resultado,
-        "bd": resultado_bd,
-    }
-    print(json.dumps(salida, ensure_ascii=False, indent=2))
-    return 0
 
 
 def run_migrar_bd_cli() -> int:
@@ -2783,8 +2167,6 @@ def run_migrar_bd_cli() -> int:
 if __name__ == "__main__":
     comando = sys.argv[1].strip().lower() if len(sys.argv) > 1 else ""
 
-    if comando in {"actualizar-meet", "descargar-meet", "meet"}:
-        raise SystemExit(run_actualizar_meet_cli())
 
     if comando in {"migrar-bd", "migrar-db", "bd", "db", "sincronizar-bd", "sync-bd", "sync-db"}:
         raise SystemExit(run_migrar_bd_cli())

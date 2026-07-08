@@ -11,3 +11,6 @@ data/reporte_canvas.db
 
 # Cache de reportes generado en runtime
 data/cache/
+
+# Insumos Meet generados por pruebas/API directa
+data/**/insumos_meet/
