@@ -686,7 +686,7 @@ def importar_capacitaciones(conexion: sqlite3.Connection, ruta: Path, tipo: str)
             curso=curso,
             modalidad=modalidad,
             fecha_actualizacion=obtener_valor(fila, "fecha_actualizacion", "fecha"),
-            fuente="csv_historico",
+            fuente=obtener_valor(fila, "origen", "fuente") or "csv_historico",
             archivo_origen=ruta.name,
         )
         total += 1

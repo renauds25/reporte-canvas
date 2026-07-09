@@ -84,7 +84,10 @@ MODALIDADES = MODALIDADES_OFICIALES
 
 ALUMNOS_CURSO_OFICIAL = os.getenv("ALUMNOS_CURSO_OFICIAL", "CURSO DE ALUMNOS")
 ALUMNOS_CURSOS_OFICIALES = [ALUMNOS_CURSO_OFICIAL]
-ALUMNOS_MODALIDADES = ["A distancia"]
+ALUMNOS_MODALIDAD_REVALIDACION = os.getenv("ALUMNOS_MODALIDAD_REVALIDACION", "Revalidado")
+ALUMNOS_REVALIDACION_ORIGEN = os.getenv("ALUMNOS_REVALIDACION_ORIGEN", "revalidacion_inicial")
+ALUMNOS_REVALIDACION_OBSERVACION = os.getenv("ALUMNOS_REVALIDACION_OBSERVACION", "Alumno con materia previa en Canvas")
+ALUMNOS_MODALIDADES = list(dict.fromkeys(["A distancia", ALUMNOS_MODALIDAD_REVALIDACION]))
 ALUMNOS_MINUTOS_MINIMOS = int(os.getenv("ALUMNOS_MINUTOS_MINIMOS", "30"))
 MAESTROS_MINUTOS_MINIMOS = int(os.getenv("MAESTROS_MINUTOS_MINIMOS", "30"))
 MAESTROS_HORARIOS_TOLERANCIA_MINUTOS = int(os.getenv("MAESTROS_HORARIOS_TOLERANCIA_MINUTOS", "15"))
@@ -248,6 +251,8 @@ def normalize_training_row(row: dict[str, str]) -> dict[str, str]:
         "curso": get_value(row, "curso", "Curso"),
         "modalidad": get_value(row, "modalidad", "Modalidad"),
         "fecha_actualizacion": get_value(row, "fecha_actualizacion", "Fecha_actualizacion", "fecha", "Fecha", "actualizacion", "actualización"),
+        "origen": get_value(row, "origen", "Origen", "fuente", "Fuente"),
+        "observacion": get_value(row, "observacion", "observación", "Observacion", "Observación", "comentario", "Comentario"),
     }
 
 
@@ -1117,7 +1122,7 @@ def process_meet_csv_batch(
     write_csv(
         ALUMNOS_CAPACITACIONES_PATH,
         all_rows,
-        ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion"],
+        ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "origen", "observacion"],
     )
 
     write_csv(
@@ -1415,6 +1420,22 @@ def read_report_cache(tipo: str) -> dict[str, Any] | None:
     return None
 
 
+def stamp_report_update_label(reporte: dict[str, Any]) -> dict[str, Any]:
+    """Marca el reporte con la hora real en que fue generado/regenerado.
+
+    La fecha visible de "Última actualización" debe representar cuándo se
+    reconstruyó el reporte/cache, no solo la fecha de modificación del CSV.
+    Conservamos el valor anterior como ultima_actualizacion_datos por si se
+    necesita revisar la fecha del último dato fuente.
+    """
+    stamped = dict(reporte)
+    ultima_datos = stamped.get("ultima_actualizacion", "")
+    if ultima_datos:
+        stamped["ultima_actualizacion_datos"] = ultima_datos
+    stamped["ultima_actualizacion"] = mexico_now_label()
+    return stamped
+
+
 def write_report_cache(tipo: str, reporte: dict[str, Any]) -> None:
     if not REPORT_CACHE_ENABLED:
         return
@@ -1463,7 +1484,7 @@ def get_report_payload(tipo: str = "maestro", force_refresh: bool = False) -> di
         if cached:
             return cached
 
-    reporte = build_report_for_tipo(tipo)
+    reporte = stamp_report_update_label(build_report_for_tipo(tipo))
     write_report_cache(tipo, reporte)
     return reporte
 
@@ -2124,6 +2145,97 @@ def ensure_runtime_directories() -> None:
     REPORT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
+
+
+def fecha_revalidacion_alumnos(value: str | None = None) -> str:
+    if value:
+        return format_date_label(value)
+    return datetime.now(ZoneInfo("America/Mexico_City")).strftime("%d/%m/%Y")
+
+
+def alumno_ya_tiene_curso(row: dict[str, str], curso: str) -> bool:
+    return norm(row.get("curso")) == norm(curso)
+
+
+def revalidar_alumnos_desde_base(fecha: str | None = None) -> dict[str, Any]:
+    """Marca como revalidados a los alumnos activos actuales.
+
+    La base activa sigue siendo data/alumnos/usuarios.csv. Este comando agrega
+    registros a data/alumnos/capacitaciones.csv para quienes todavía no tienen
+    el CURSO DE ALUMNOS registrado. No duplica alumnos que ya tengan el curso.
+    """
+
+    ensure_runtime_directories()
+
+    usuarios = read_users(ALUMNOS_USUARIOS_PATH)
+    capacitaciones_actuales = read_capacitaciones(ALUMNOS_CAPACITACIONES_PATH)
+
+    existentes_por_id = {
+        clean(row.get("id"))
+        for row in capacitaciones_actuales
+        if clean(row.get("id")) and alumno_ya_tiene_curso(row, ALUMNOS_CURSO_OFICIAL)
+    }
+    existentes_por_correo = {
+        normalize_email(row.get("correo"))
+        for row in capacitaciones_actuales
+        if normalize_email(row.get("correo")) and alumno_ya_tiene_curso(row, ALUMNOS_CURSO_OFICIAL)
+    }
+
+    fecha_registro = fecha_revalidacion_alumnos(fecha)
+    nuevos: list[dict[str, str]] = []
+    omitidos = 0
+
+    for usuario in usuarios:
+        alumno_id = clean(usuario.get("id"))
+        correo = normalize_email(usuario.get("correo"))
+
+        if (alumno_id and alumno_id in existentes_por_id) or (correo and correo in existentes_por_correo):
+            omitidos += 1
+            continue
+
+        nuevos.append({
+            "id": alumno_id,
+            "nombre": clean(usuario.get("nombre")),
+            "correo": correo,
+            "curso": ALUMNOS_CURSO_OFICIAL,
+            "modalidad": ALUMNOS_MODALIDAD_REVALIDACION,
+            "fecha_actualizacion": fecha_registro,
+            "origen": ALUMNOS_REVALIDACION_ORIGEN,
+            "observacion": ALUMNOS_REVALIDACION_OBSERVACION,
+        })
+
+    todas = deduplicate_training_rows(capacitaciones_actuales + nuevos)
+    write_csv(
+        ALUMNOS_CAPACITACIONES_PATH,
+        todas,
+        ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "origen", "observacion"],
+    )
+
+    return {
+        "ok": True,
+        "usuarios_activos": len(usuarios),
+        "revalidaciones_agregadas": len(nuevos),
+        "omitidos_por_ya_tener_curso": omitidos,
+        "total_capacitaciones_alumnos": len(todas),
+        "fecha_revalidacion": fecha_registro,
+        "archivo": str(ALUMNOS_CAPACITACIONES_PATH),
+    }
+
+
+def run_revalidar_alumnos_cli() -> int:
+    fecha = sys.argv[2].strip() if len(sys.argv) > 2 else None
+
+    try:
+        resultado = revalidar_alumnos_desde_base(fecha)
+        resultado_bd = sincronizar_bd_desde_csv()
+    except Exception as exc:
+        print(f"ERROR: No se pudo revalidar alumnos: {exc}", file=sys.stderr)
+        return 1
+
+    print(json.dumps({"revalidacion": resultado, "bd": resultado_bd.get("resultado", {})}, ensure_ascii=False, indent=2))
+    return 0
+
+
 def sincronizar_bd_desde_csv() -> dict[str, Any]:
     from migrar_csv_a_bd import migrar_csv_a_bd
 
@@ -2173,6 +2285,9 @@ def run_migrar_bd_cli() -> int:
 if __name__ == "__main__":
     comando = sys.argv[1].strip().lower() if len(sys.argv) > 1 else ""
 
+
+    if comando in {"revalidar-alumnos", "revalidar-alumno", "revalidar", "alumnos-revalidar"}:
+        raise SystemExit(run_revalidar_alumnos_cli())
 
     if comando in {"migrar-bd", "migrar-db", "bd", "db", "sincronizar-bd", "sync-bd", "sync-db"}:
         raise SystemExit(run_migrar_bd_cli())

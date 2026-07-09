@@ -521,7 +521,7 @@ def importar_capacitaciones_pg(conexion, ruta: Path, tipo: str) -> int:
             curso=curso,
             modalidad=modalidad,
             fecha_actualizacion=obtener_valor(fila, "fecha_actualizacion", "fecha"),
-            fuente="csv_historico",
+            fuente=obtener_valor(fila, "origen", "fuente") or "csv_historico",
             archivo_origen=ruta.name,
         )
         total += 1
