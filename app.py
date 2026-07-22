@@ -9,6 +9,8 @@ import re
 import os
 import sys
 import unicodedata
+import urllib.error
+import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -53,6 +55,17 @@ ALUMNOS_REPORT_CACHE_PATH = REPORT_CACHE_DIR / "reporte_alumnos.json"
 MEET_API_TOKEN = os.getenv("MEET_API_TOKEN", "").strip()
 MEET_API_DIRECT_ENABLED = os.getenv("MEET_API_DIRECT_ENABLED", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
 MEET_API_ALLOW_TOKEN_IN_BODY = os.getenv("MEET_API_ALLOW_TOKEN_IN_BODY", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
+PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "").strip().rstrip("/")
+AUTO_REGENERAR_CACHE_REMOTO = os.getenv("AUTO_REGENERAR_CACHE_REMOTO", "0").strip().lower() in {"1", "true", "yes", "si", "sí"}
+REMOTE_CACHE_TOKEN = (
+    os.getenv("REMOTE_CACHE_TOKEN", "").strip()
+    or os.getenv("CACHE_API_TOKEN", "").strip()
+    or MEET_API_TOKEN
+)
+try:
+    REMOTE_CACHE_TIMEOUT = float(os.getenv("REMOTE_CACHE_TIMEOUT", "30"))
+except ValueError:
+    REMOTE_CACHE_TIMEOUT = 30.0
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
@@ -1521,13 +1534,66 @@ def regenerate_report_cache_for_tipo(tipo: str) -> dict[str, Any]:
     }
 
 
-def sincronizar_bd_meet_api_ligero(tipo: str) -> dict[str, Any]:
-    """Sincroniza solo las tablas afectadas por una ingesta Meet directa.
 
-    Evita reconstruir toda la BD en cada llamada de Apps Script, reduciendo
-    timeouts/500 en Render. Para limpiezas manuales o cambios grandes, sigue
-    usando `python app.py sincronizar-bd`.
-    """
+def regenerar_cache_remoto_si_configurado() -> dict[str, Any]:
+
+    if not AUTO_REGENERAR_CACHE_REMOTO:
+        return {"enabled": False, "ok": True, "mensaje": "AUTO_REGENERAR_CACHE_REMOTO deshabilitado."}
+
+    if not PUBLIC_APP_URL:
+        return {"enabled": True, "ok": False, "error": "Falta configurar PUBLIC_APP_URL."}
+
+    if not REMOTE_CACHE_TOKEN:
+        return {"enabled": True, "ok": False, "error": "Falta configurar REMOTE_CACHE_TOKEN o MEET_API_TOKEN."}
+
+    url = f"{PUBLIC_APP_URL}/api/cache/regenerar"
+    body = json.dumps({"origen": "sincronizar-bd"}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {REMOTE_CACHE_TOKEN}",
+            "X-Meet-Api-Token": REMOTE_CACHE_TOKEN,
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=REMOTE_CACHE_TIMEOUT) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+            try:
+                payload = json.loads(raw)
+            except Exception:
+                payload = {"respuesta": raw}
+            return {
+                "enabled": True,
+                "ok": 200 <= response.status < 300,
+                "status": response.status,
+                "url": url,
+                "respuesta": payload,
+            }
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        return {
+            "enabled": True,
+            "ok": False,
+            "status": exc.code,
+            "url": url,
+            "error": raw,
+        }
+    except Exception as exc:
+        return {
+            "enabled": True,
+            "ok": False,
+            "url": url,
+            "error": str(exc),
+        }
+
+
+
+def sincronizar_bd_meet_api_ligero(tipo: str) -> dict[str, Any]:
     tipo_normalizado = normalize_meet_tipo(tipo)
     tipo_db = "maestro" if tipo_normalizado == "maestros" else "alumno"
 
@@ -1961,6 +2027,20 @@ def admin_regenerar_cache():
     return redirect(url_for("admin_panel", updated="cache"))
 
 
+
+@app.post("/api/cache/regenerar")
+def api_cache_regenerar():
+    ok_token, token_error = validate_meet_api_token()
+    if not ok_token:
+        return jsonify({"ok": False, "error": token_error}), 401
+
+    try:
+        cache = regenerate_report_cache()
+        return jsonify({"ok": True, "cache": cache})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"No se pudo regenerar cache: {exc}"}), 500
+
+
 @app.get("/admin/api/ingestas")
 @report_login_required
 @login_required
@@ -2232,7 +2312,12 @@ def run_revalidar_alumnos_cli() -> int:
         print(f"ERROR: No se pudo revalidar alumnos: {exc}", file=sys.stderr)
         return 1
 
-    print(json.dumps({"revalidacion": resultado, "bd": resultado_bd.get("resultado", {})}, ensure_ascii=False, indent=2))
+    salida = {
+        "revalidacion": resultado,
+        "bd": resultado_bd.get("resultado", {}),
+        "cache_remoto": resultado_bd.get("cache_remoto", {}),
+    }
+    print(json.dumps(salida, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -2257,12 +2342,15 @@ def sincronizar_bd_desde_csv() -> dict[str, Any]:
             "error": f"No se pudo regenerar cache: {exc}",
         }
 
+    cache_remoto = regenerar_cache_remoto_si_configurado()
+
     return {
         "ok": True,
         "database_backend": backend,
         "database_path": destino,
         "resultado": resultado,
         "cache": cache,
+        "cache_remoto": cache_remoto,
     }
 
 
@@ -2279,6 +2367,14 @@ def run_migrar_bd_cli() -> int:
 
     print(f"Base de datos generada/actualizada: {resultado_bd['database_path']}")
     print(json.dumps(resultado_bd["resultado"], ensure_ascii=False, indent=2))
+
+    cache_remoto = resultado_bd.get("cache_remoto", {})
+    if cache_remoto.get("enabled"):
+        if cache_remoto.get("ok"):
+            print("Cache remoto regenerado correctamente.")
+        else:
+            print(f"AVISO: No se pudo regenerar cache remoto: {cache_remoto.get('error')}", file=sys.stderr)
+
     return 0
 
 
