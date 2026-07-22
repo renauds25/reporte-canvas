@@ -967,7 +967,7 @@ def ordenar_ingestas_admin(rows: list[dict[str, Any]], limite: int) -> list[dict
     enriquecidas = [enrich_ingesta_row(row) for row in rows]
 
     # El panel admin está enfocado en el flujo principal actual:
-    # Apps Script -> API directa -> Render/PostgreSQL.
+    # Apps Script -> API directa -> Render/MySQL.
     # El historial viejo de adjuntos CSV se conserva en BD como respaldo,
     # pero no se muestra para no mezclarlo con las ingestas reales nuevas.
     solo_api_directa = [
@@ -990,9 +990,9 @@ def leer_ingestas_recientes_admin(limite: int = 12) -> list[dict[str, Any]]:
     limite_busqueda = max(limite * 5, 100)
     try:
         if database_url_configurada():
-            from database_postgres import leer_ingestas_recientes_postgres
+            from database_mysql import leer_ingestas_recientes_mysql
 
-            rows = leer_ingestas_recientes_postgres(limite=limite_busqueda)
+            rows = leer_ingestas_recientes_mysql(limite=limite_busqueda)
         else:
             from database import leer_ingestas_recientes
 
@@ -1331,7 +1331,7 @@ def read_capacitaciones(path: Path = CAPACITACIONES_PATH) -> list[dict[str, str]
 
 
 def database_url_configurada() -> bool:
-    return bool(os.getenv("DATABASE_URL", "").strip())
+    return bool(os.getenv("DATABASE_URL", "").strip() or os.getenv("DB_HOST", "").strip())
 
 
 def database_available_for_reports() -> bool:
@@ -1352,9 +1352,9 @@ def read_report_users(tipo: str = "maestro") -> list[dict[str, str]]:
     if database_available_for_reports():
         try:
             if database_url_configurada():
-                from database_postgres import leer_usuarios_reporte_postgres
+                from database_mysql import leer_usuarios_reporte_mysql
 
-                users = leer_usuarios_reporte_postgres(tipo)
+                users = leer_usuarios_reporte_mysql(tipo)
             else:
                 from database import leer_usuarios_reporte
 
@@ -1372,9 +1372,9 @@ def read_report_capacitaciones(tipo: str = "maestro") -> list[dict[str, str]]:
     if database_available_for_reports():
         try:
             if database_url_configurada():
-                from database_postgres import leer_capacitaciones_reporte_postgres
+                from database_mysql import leer_capacitaciones_reporte_mysql
 
-                rows = leer_capacitaciones_reporte_postgres(tipo)
+                rows = leer_capacitaciones_reporte_mysql(tipo)
             else:
                 from database import leer_capacitaciones_reporte
 
@@ -1446,7 +1446,7 @@ def write_report_cache(tipo: str, reporte: dict[str, Any]) -> None:
     payload = {
         "tipo": tipo,
         "generado_en": datetime.now(ZoneInfo("America/Mexico_City")).isoformat(timespec="seconds"),
-        "backend": "postgresql" if database_url_configurada() else "sqlite" if database_available_for_reports() else "csv",
+        "backend": "mysql" if database_url_configurada() else "sqlite" if database_available_for_reports() else "csv",
         "reporte": reporte,
     }
     with temp_path.open("w", encoding="utf-8") as file:
@@ -1536,14 +1536,14 @@ def sincronizar_bd_meet_api_ligero(tipo: str) -> dict[str, Any]:
         resultado["modo"] = "sincronizacion_completa_sqlite"
         return resultado
 
-    from database_postgres import (
-        crear_engine_postgres,
+    from database_mysql import (
+        crear_engine_mysql,
         ejecutar,
-        importar_auxiliares_pg,
-        importar_capacitaciones_pg,
-        importar_ingestas_pg,
-        inicializar_postgres,
-        resumen_postgres,
+        importar_auxiliares_mysql,
+        importar_capacitaciones_mysql,
+        importar_ingestas_mysql,
+        inicializar_mysql,
+        resumen_mysql,
     )
 
     if tipo_db == "maestro":
@@ -1557,18 +1557,18 @@ def sincronizar_bd_meet_api_ligero(tipo: str) -> dict[str, Any]:
         descartados_path = ALUMNOS_DESCARTADOS_PATH
         cache_tipo = "alumno"
 
-    engine = crear_engine_postgres()
+    engine = crear_engine_mysql()
     with engine.begin() as conexion:
-        inicializar_postgres(conexion)
-        capacitaciones = importar_capacitaciones_pg(conexion, capacitaciones_path, tipo_db)
+        inicializar_mysql(conexion)
+        capacitaciones = importar_capacitaciones_mysql(conexion, capacitaciones_path, tipo_db)
 
         ejecutar(conexion, "DELETE FROM pendientes_revision WHERE tipo = :tipo", {"tipo": tipo_db})
         ejecutar(conexion, "DELETE FROM descartados WHERE tipo = :tipo", {"tipo": tipo_db})
 
-        pendientes = importar_auxiliares_pg(conexion, pendientes_path, tipo_db, "pendientes_revision")
-        descartados = importar_auxiliares_pg(conexion, descartados_path, tipo_db, "descartados")
-        ingestas = importar_ingestas_pg(conexion, ALUMNOS_MEET_PROCESADOS_PATH)
-        resumen = resumen_postgres(conexion)
+        pendientes = importar_auxiliares_mysql(conexion, pendientes_path, tipo_db, "pendientes_revision")
+        descartados = importar_auxiliares_mysql(conexion, descartados_path, tipo_db, "descartados")
+        ingestas = importar_ingestas_mysql(conexion, ALUMNOS_MEET_PROCESADOS_PATH)
+        resumen = resumen_mysql(conexion)
 
     try:
         cache = regenerate_report_cache_for_tipo(cache_tipo)
@@ -1580,7 +1580,7 @@ def sincronizar_bd_meet_api_ligero(tipo: str) -> dict[str, Any]:
 
     return {
         "ok": True,
-        "database_backend": "postgresql",
+        "database_backend": "mysql",
         "modo": "incremental_meet_api",
         "tipo": tipo_db,
         "capacitaciones_importadas": capacitaciones,
@@ -1906,7 +1906,7 @@ def api_meet_health():
         "ok": True,
         "api_directa_habilitada": MEET_API_DIRECT_ENABLED,
         "token_configurado": bool(MEET_API_TOKEN),
-        "backend": "postgresql" if database_url_configurada() else "sqlite",
+        "backend": "mysql" if database_url_configurada() else "sqlite",
     })
 
 
@@ -2240,10 +2240,10 @@ def sincronizar_bd_desde_csv() -> dict[str, Any]:
     from migrar_csv_a_bd import migrar_csv_a_bd
 
     resultado = migrar_csv_a_bd(reiniciar=True)
-    backend = resultado.get("backend", "postgresql" if database_url_configurada() else "sqlite")
+    backend = resultado.get("backend", "mysql" if database_url_configurada() else "sqlite")
 
-    if backend == "postgresql":
-        destino = "DATABASE_URL"
+    if backend == "mysql":
+        destino = "MySQL/Azure"
     else:
         from database import DATABASE_PATH
 

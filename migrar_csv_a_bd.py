@@ -35,8 +35,8 @@ from database import (  # noqa: E402
 )
 
 
-def usar_postgres() -> bool:
-    return bool(os.getenv("DATABASE_URL", "").strip())
+def usar_mysql() -> bool:
+    return bool(os.getenv("DATABASE_URL", "").strip() or os.getenv("DB_HOST", "").strip())
 
 
 def migrar_csv_a_sqlite(reiniciar: bool = True, db_path: Path = DATABASE_PATH) -> dict[str, int]:
@@ -67,11 +67,11 @@ def migrar_csv_a_sqlite(reiniciar: bool = True, db_path: Path = DATABASE_PATH) -
 
 
 def migrar_csv_a_bd(reiniciar: bool = True, db_path: Path = DATABASE_PATH) -> dict[str, int]:
-    if usar_postgres():
-        from database_postgres import migrar_csv_a_postgres
+    if usar_mysql():
+        from database_mysql import migrar_csv_a_mysql
 
-        resultado = migrar_csv_a_postgres(reiniciar=reiniciar)
-        resultado["backend"] = "postgresql"
+        resultado = migrar_csv_a_mysql(reiniciar=reiniciar)
+        resultado["backend"] = "mysql"
         return resultado
 
     return migrar_csv_a_sqlite(reiniciar=reiniciar, db_path=db_path)
@@ -87,15 +87,15 @@ def main() -> int:
     parser.add_argument(
         "--db",
         default=str(DATABASE_PATH),
-        help="Ruta del archivo SQLite cuando no se usa DATABASE_URL. Por defecto: data/reporte_canvas.db",
+        help="Ruta del archivo SQLite cuando no se usa DATABASE_URL o DB_HOST. Por defecto: data/reporte_canvas.db",
     )
     args = parser.parse_args()
 
     db_path = Path(args.db)
     resultado = migrar_csv_a_bd(reiniciar=not args.append, db_path=db_path)
 
-    if usar_postgres():
-        print("Base de datos PostgreSQL generada/actualizada desde DATABASE_URL.")
+    if usar_mysql():
+        print("Base de datos MySQL generada/actualizada desde la configuración de entorno.")
     else:
         print(f"Base de datos SQLite generada/actualizada: {db_path}")
 
