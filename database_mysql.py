@@ -823,7 +823,7 @@ def leer_capacitaciones_reporte_mysql(tipo: str) -> list[dict[str, str]]:
         filas = ejecutar(
             conexion,
             """
-            SELECT id_externo, nombre, correo, carrera, division, curso, modalidad, fecha_actualizacion
+            SELECT id_externo, nombre, correo, carrera, division, curso, modalidad, fecha_actualizacion, fuente, archivo_origen
             FROM capacitaciones
             WHERE tipo = :tipo
             ORDER BY fecha_actualizacion DESC, actualizado_en DESC
@@ -841,6 +841,8 @@ def leer_capacitaciones_reporte_mysql(tipo: str) -> list[dict[str, str]]:
             "curso": limpiar(fila["curso"]),
             "modalidad": limpiar(fila["modalidad"]),
             "fecha_actualizacion": fecha_para_reporte(fila["fecha_actualizacion"]),
+            "origen": limpiar(fila.get("fuente", "")) if hasattr(fila, "get") else limpiar(fila["fuente"]),
+            "archivo_origen": limpiar(fila.get("archivo_origen", "")) if hasattr(fila, "get") else limpiar(fila["archivo_origen"]),
         }
         for fila in filas
         if (limpiar(fila["id_externo"]) or limpiar(fila["nombre"]) or limpiar(fila["correo"]))

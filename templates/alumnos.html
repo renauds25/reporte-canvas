@@ -24,30 +24,30 @@
                     <p id="alumnosUltimaActualizacion">Cargando datos...</p>
                 </div>
             </div>
-            <div class="cards mini">
+            <div class="cards mini alumnos-summary-cards">
                 <article class="card">
                     <span>Total de alumnos</span>
                     <strong id="alumnosTotalPersonas">0</strong>
                 </article>
-                <article class="card">
-                    <span>Con avance</span>
-                    <strong id="alumnosConAvance">0</strong>
-                </article>
-                <article class="card">
-                    <span>Cursos registrados</span>
-                    <strong id="alumnosTotalRegistros">0</strong>
+                <article class="card success alumnos-avance-card">
+                    <span>Avance total</span>
+                    <strong id="alumnosAvanceTotal">0%</strong>
+                    <small id="alumnosAvanceTotalDetalle" class="card-note avance-breakdown"></small>
                 </article>
                 <article class="card success">
-                    <span>Completos</span>
-                    <strong id="alumnosCompletos">0</strong>
+                    <span>Revalidados</span>
+                    <strong id="alumnosRevalidados">0</strong>
+                    <small id="alumnosRevalidadosDetalle" class="card-note"></small>
+                </article>
+                <article class="card success">
+                    <span>Capacitados nuevos</span>
+                    <strong id="alumnosNuevosCapacitados">0</strong>
+                    <small id="alumnosNuevosDetalle" class="card-note"></small>
                 </article>
                 <article class="card warning">
                     <span>Pendientes</span>
                     <strong id="alumnosPendientes">0</strong>
-                </article>
-                <article class="card warning">
-                    <span>Sin iniciar</span>
-                    <strong id="alumnosSinIniciar">0</strong>
+                    <small id="alumnosPendientesDetalle" class="card-note"></small>
                 </article>
             </div>
         </section>
@@ -68,7 +68,7 @@
                 <div class="panel-title-row">
                     <div>
                         <h2>Avance del curso</h2>
-                        <p class="muted small-note">Participantes con registro válido en el curso de alumnos.</p>
+                        <p class="muted small-note">Revalidados más alumnos capacitados nuevos, sin duplicar alumnos que hayan tomado el curso más de una vez.</p>
                     </div>
                 </div>
                 <div id="alumnosCursoResumen" class="summary-list progress-list"></div>

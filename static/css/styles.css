@@ -1448,3 +1448,64 @@ code {
 .code-note p {
     margin-top: 0;
 }
+
+.card-note {
+    display: block;
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.summary-row-total {
+    margin-top: 4px;
+    padding-top: 14px;
+    border-top: 2px solid var(--line);
+    border-bottom: 0;
+    font-weight: 800;
+}
+
+.alumnos-summary-cards .alumnos-avance-card .avance-breakdown {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    align-items: center;
+}
+
+.avance-percent {
+    color: var(--success);
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.alumnos-summary-cards .card.warning {
+    grid-column: 1 / 2;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 7px 11px;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    background: #eef3ff;
+    color: var(--primary);
+}
+
+.badge.success {
+    background: #e9f7f0;
+    color: var(--success);
+}
+
+.badge.warning {
+    background: #fff4df;
+    color: var(--warning);
+}
+
+.badge.neutral {
+    background: #eef3ff;
+    color: #4f5f7d;
+}

@@ -820,7 +820,7 @@ def leer_capacitaciones_reporte(tipo: str, ruta: Path = DATABASE_PATH) -> list[d
         inicializar_bd(conexion)
         filas = conexion.execute(
             """
-            SELECT id_externo, nombre, correo, carrera, division, curso, modalidad, fecha_actualizacion
+            SELECT id_externo, nombre, correo, carrera, division, curso, modalidad, fecha_actualizacion, fuente, archivo_origen
             FROM capacitaciones
             WHERE tipo = ?
             ORDER BY fecha_actualizacion DESC, actualizado_en DESC
@@ -838,6 +838,8 @@ def leer_capacitaciones_reporte(tipo: str, ruta: Path = DATABASE_PATH) -> list[d
             "curso": limpiar(fila["curso"]),
             "modalidad": limpiar(fila["modalidad"]),
             "fecha_actualizacion": fecha_para_reporte(fila["fecha_actualizacion"]),
+            "origen": limpiar(fila["fuente"]),
+            "archivo_origen": limpiar(fila["archivo_origen"]),
         }
         for fila in filas
         if (limpiar(fila["id_externo"]) or limpiar(fila["nombre"]) or limpiar(fila["correo"]))

@@ -63,9 +63,6 @@
                 <p class="muted">Registros sin coincidencia en base maestra: <span id="adminTotalSinCoincidencia">{{ reporte.total_registros_sin_coincidencia }}</span></p>
                 <div class="actions">
                     <a class="btn secondary" href="{{ url_for('alumnos') }}">Abrir módulo de alumnos</a>
-                    <form method="post" action="/admin/cache/regenerar" class="inline-form">
-                        <button class="btn secondary" type="submit">Regenerar cache</button>
-                    </form>
                 </div>
             </section>
 
@@ -98,12 +95,17 @@
                     <div class="admin-modalidad-card">
                         <h3>Conteo por modalidad</h3>
                         <div id="adminModalidadList" class="summary-list">
+                            {% set total_modalidades = reporte.conteo_por_modalidad.values() | sum %}
                             {% for modalidad, total in reporte.conteo_por_modalidad.items() %}
                                 <div class="summary-row">
                                     <span>{{ modalidad }}</span>
                                     <strong>{{ total }}</strong>
                                 </div>
                             {% endfor %}
+                            <div class="summary-row summary-row-total">
+                                <span>Total</span>
+                                <strong>{{ total_modalidades }}</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -124,6 +126,9 @@
                     <div id="adminQualityActions" class="actions">
                         <a class="btn secondary" href="/admin/download/sin-coincidencia">Descargar no coinciden</a>
                         <a class="btn secondary" href="/admin/download/sin-iniciar">Descargar sin iniciar</a>
+                        <form method="post" action="/admin/cache/regenerar" class="inline-form">
+                            <button class="btn secondary" type="submit">Regenerar cache</button>
+                        </form>
                     </div>
                 {% else %}
                     <p class="muted">Sube la base maestra de usuarios para activar la comparación de datos.</p>
@@ -132,7 +137,7 @@
 
             <section class="section panel">
                 <div class="actions">
-                    <a class="btn secondary" href="{{ url_for('alumnos') }}">Abrir reporte de alumnos</a>
+                    <a class="btn secondary" href="/admin/download/alumnos/reporte">Descargar reporte alumnos</a>
                     <a class="btn secondary" href="/admin/download/alumnos/pendientes">Descargar pendientes alumnos</a>
                     <a class="btn secondary" href="/admin/download/alumnos/descartados">Descargar descartados alumnos</a>
                     <a class="btn secondary" href="/admin/download/maestros/meet-pendientes">Descargar pendientes Meet maestros</a>
@@ -251,15 +256,23 @@
             const container = document.querySelector("#adminModalidadList");
             if (!container) return;
 
-            const modalidades = reporte.modalidades || Object.keys(reporte.conteo_por_modalidad || {});
-            container.innerHTML = modalidades
+            const conteo = reporte.conteo_por_modalidad || {};
+            const modalidades = reporte.modalidades || Object.keys(conteo || {});
+            const total = modalidades.reduce((sum, modalidad) => sum + Number(conteo[modalidad] || 0), 0);
+            const rows = modalidades
                 .map((modalidad) => `
                     <div class="summary-row">
                         <span>${modalidad}</span>
-                        <strong>${adminFormatNumber((reporte.conteo_por_modalidad || {})[modalidad] || 0)}</strong>
+                        <strong>${adminFormatNumber(conteo[modalidad] || 0)}</strong>
                     </div>
                 `)
                 .join("");
+
+            container.innerHTML = `${rows}
+                <div class="summary-row summary-row-total">
+                    <span>Total</span>
+                    <strong>${adminFormatNumber(total)}</strong>
+                </div>`;
         }
 
         function updateAdminDashboard(reporte) {

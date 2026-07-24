@@ -1434,18 +1434,20 @@ def read_report_cache(tipo: str) -> dict[str, Any] | None:
 
 
 def stamp_report_update_label(reporte: dict[str, Any]) -> dict[str, Any]:
-    """Marca el reporte con la hora real en que fue generado/regenerado.
+    """Marca el reporte con la hora real de una actualización explícita.
 
-    La fecha visible de "Última actualización" debe representar cuándo se
-    reconstruyó el reporte/cache, no solo la fecha de modificación del CSV.
-    Conservamos el valor anterior como ultima_actualizacion_datos por si se
-    necesita revisar la fecha del último dato fuente.
+    Esta función solo debe usarse cuando sí ocurrió una acción real de
+    actualización: sincronizar-bd, API directa de Meet o regeneración manual
+    del cache desde admin. No debe ejecutarse por una visita normal al reporte,
+    porque eso haría parecer que hubo datos nuevos solo por abrir la página o
+    despertar Render.
     """
     stamped = dict(reporte)
     ultima_datos = stamped.get("ultima_actualizacion", "")
     if ultima_datos:
         stamped["ultima_actualizacion_datos"] = ultima_datos
     stamped["ultima_actualizacion"] = mexico_now_label()
+    stamped["ultima_actualizacion_origen"] = "actualizacion_explicita"
     return stamped
 
 
@@ -1486,26 +1488,33 @@ def build_report_for_tipo(tipo: str) -> dict[str, Any]:
             modalidades=ALUMNOS_MODALIDADES,
             cursos_requeridos=1,
             ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
+            es_reporte_alumnos=True,
         )
 
     return build_report(rows, users)
 
 
-def get_report_payload(tipo: str = "maestro", force_refresh: bool = False) -> dict[str, Any]:
+def get_report_payload(
+    tipo: str = "maestro",
+    force_refresh: bool = False,
+    mark_update: bool = False,
+) -> dict[str, Any]:
     if REPORT_CACHE_ENABLED and not force_refresh:
         cached = read_report_cache(tipo)
         if cached:
             return cached
 
-    reporte = stamp_report_update_label(build_report_for_tipo(tipo))
+    reporte = build_report_for_tipo(tipo)
+    if mark_update:
+        reporte = stamp_report_update_label(reporte)
     write_report_cache(tipo, reporte)
     return reporte
 
 
 def regenerate_report_cache() -> dict[str, Any]:
     invalidate_report_cache()
-    maestros = get_report_payload("maestro", force_refresh=True)
-    alumnos = get_report_payload("alumno", force_refresh=True)
+    maestros = get_report_payload("maestro", force_refresh=True, mark_update=True)
+    alumnos = get_report_payload("alumno", force_refresh=True, mark_update=True)
     return {
         "cache_enabled": REPORT_CACHE_ENABLED,
         "maestros": {
@@ -1524,7 +1533,7 @@ def regenerate_report_cache() -> dict[str, Any]:
 def regenerate_report_cache_for_tipo(tipo: str) -> dict[str, Any]:
     tipo = "alumno" if normalize_meet_tipo(tipo) == "alumnos" or clean(tipo).lower() == "alumno" else "maestro"
     invalidate_report_cache(tipo)
-    reporte = get_report_payload(tipo, force_refresh=True)
+    reporte = get_report_payload(tipo, force_refresh=True, mark_update=True)
     return {
         "cache_enabled": REPORT_CACHE_ENABLED,
         "tipo": tipo,
@@ -1701,6 +1710,20 @@ def resolve_person(row: dict[str, str], by_id: dict[str, dict[str, str]], by_ema
     return fallback, None, "sin_coincidencia"
 
 
+def es_revalidacion_alumno(row: dict[str, Any]) -> bool:
+    modalidad = norm(str(row.get("modalidad", "")))
+    origen = norm(str(row.get("origen", row.get("fuente", ""))))
+    observacion = norm(str(row.get("observacion", "")))
+    return "revalid" in modalidad or "revalid" in origen or "revalid" in observacion
+
+
+def porcentaje_sobre_total(valor: int | float, total: int | float) -> float:
+    total_num = float(total or 0)
+    if total_num <= 0:
+        return 0.0
+    return round((float(valor or 0) / total_num) * 100, 1)
+
+
 def build_report(
     rows: list[dict[str, str]],
     users: list[dict[str, str]],
@@ -1708,6 +1731,7 @@ def build_report(
     modalidades: list[str] | None = None,
     cursos_requeridos: int | None = None,
     ultima_actualizacion_path: Path = CAPACITACIONES_PATH,
+    es_reporte_alumnos: bool = False,
 ) -> dict[str, Any]:
     cursos_oficiales = cursos_oficiales or CURSOS_OFICIALES
     modalidades = modalidades or MODALIDADES
@@ -1737,6 +1761,8 @@ def build_report(
             "curso": row["curso"],
             "modalidad": row["modalidad"],
             "fecha_actualizacion": row["fecha_actualizacion"],
+            "origen": row.get("origen", row.get("fuente", "")),
+            "observacion": row.get("observacion", ""),
             "coincidencia": match_type,
         }
 
@@ -1752,8 +1778,16 @@ def build_report(
             "curso": resolved["curso"],
             "modalidad": resolved["modalidad"],
             "fecha_actualizacion": resolved["fecha_actualizacion"],
+            "origen": resolved.get("origen", ""),
+            "observacion": resolved.get("observacion", ""),
             "coincidencia": match_type,
         })
+
+        # En alumnos, el reporte debe cruzarse contra la base activa.
+        # Registros históricos de alumnos que ya no estén en la lista nueva
+        # se conservan en BD/CSV, pero no cuentan en el total ni en el avance.
+        if es_reporte_alumnos and users and not master_user:
+            continue
 
         if persona_key not in personas:
             personas[persona_key] = {
@@ -1767,7 +1801,13 @@ def build_report(
                 "completo": False,
                 "ultima_actualizacion": resolved["fecha_actualizacion"],
                 "origen": "base_maestra" if master_user else "capacitaciones",
+                "en_base": bool(master_user),
+                "tiene_revalidacion": False,
+                "tiene_capacitacion_nueva": False,
+                "tipo_cumplimiento": "pendiente",
             }
+
+        es_revalidado = es_revalidacion_alumno(resolved) if es_reporte_alumnos else False
 
         personas[persona_key]["cursos"].append(
             {
@@ -1776,8 +1816,17 @@ def build_report(
                 "fecha_actualizacion": resolved["fecha_actualizacion"],
                 "carrera": resolved.get("carrera", ""),
                 "division": resolved.get("division", ""),
+                "origen": resolved.get("origen", ""),
+                "observacion": resolved.get("observacion", ""),
+                "es_revalidacion": es_revalidado,
             }
         )
+
+        if es_reporte_alumnos:
+            if es_revalidado:
+                personas[persona_key]["tiene_revalidacion"] = True
+            else:
+                personas[persona_key]["tiene_capacitacion_nueva"] = True
 
         if not personas[persona_key].get("carrera") and resolved.get("carrera"):
             personas[persona_key]["carrera"] = resolved["carrera"]
@@ -1812,6 +1861,13 @@ def build_report(
         persona["total_cursos"] = len(cursos_unicos)
         persona["completo"] = len(cursos_unicos) >= cursos_requeridos
         persona["pendientes"] = max(0, cursos_requeridos - len(cursos_unicos))
+        if es_reporte_alumnos:
+            if persona["completo"] and persona.get("tiene_capacitacion_nueva"):
+                persona["tipo_cumplimiento"] = "nuevo"
+            elif persona["completo"] and persona.get("tiene_revalidacion"):
+                persona["tipo_cumplimiento"] = "revalidado"
+            else:
+                persona["tipo_cumplimiento"] = "pendiente"
         persona["cursos"] = sorted(
             persona["cursos"],
             key=lambda item: parse_date(item["fecha_actualizacion"]),
@@ -1836,6 +1892,35 @@ def build_report(
     total_personas_reporte = total_usuarios_esperados if users else len(personas_lista)
     personas_con_avance = len(personas_lista)
     personas_completas = sum(1 for persona in personas_lista if persona["completo"])
+
+    alumnos_revalidados = 0
+    alumnos_nuevos_capacitados = 0
+    alumnos_cumplidos_total = personas_completas
+    alumnos_nuevos_esperados = 0
+    alumnos_nuevos_pendientes = 0
+    alumnos_porcentaje_revalidados = 0.0
+    alumnos_porcentaje_nuevos = 0.0
+    alumnos_porcentaje_cumplimiento = porcentaje_sobre_total(personas_completas, total_personas_reporte)
+
+    if es_reporte_alumnos:
+        alumnos_revalidados = sum(
+            1
+            for persona in personas_lista
+            if persona["completo"] and persona.get("tipo_cumplimiento") == "revalidado"
+        )
+        alumnos_nuevos_capacitados = sum(
+            1
+            for persona in personas_lista
+            if persona["completo"] and persona.get("tipo_cumplimiento") == "nuevo"
+        )
+        alumnos_cumplidos_total = alumnos_revalidados + alumnos_nuevos_capacitados
+        personas_completas = alumnos_cumplidos_total
+        alumnos_nuevos_esperados = max(0, total_personas_reporte - alumnos_revalidados)
+        alumnos_nuevos_pendientes = max(0, alumnos_nuevos_esperados - alumnos_nuevos_capacitados)
+        alumnos_porcentaje_revalidados = porcentaje_sobre_total(alumnos_revalidados, total_personas_reporte)
+        alumnos_porcentaje_nuevos = porcentaje_sobre_total(alumnos_nuevos_capacitados, total_personas_reporte)
+        alumnos_porcentaje_cumplimiento = porcentaje_sobre_total(alumnos_cumplidos_total, total_personas_reporte)
+
     cursos_1_y_2 = {norm(curso) for curso in cursos_oficiales[:2]}
     personas_con_cursos_1_y_2 = sum(
         1
@@ -1850,6 +1935,9 @@ def build_report(
     else:
         personas_pendientes = personas_pendientes_con_avance
 
+    if es_reporte_alumnos:
+        personas_pendientes = max(0, total_personas_reporte - alumnos_cumplidos_total)
+
     return {
         "cursos_oficiales": cursos_oficiales,
         "modalidades": modalidades,
@@ -1863,6 +1951,14 @@ def build_report(
         "personas_con_cursos_1_y_2": personas_con_cursos_1_y_2,
         "personas_pendientes": personas_pendientes,
         "personas_pendientes_con_avance": personas_pendientes_con_avance,
+        "alumnos_revalidados": alumnos_revalidados,
+        "alumnos_nuevos_capacitados": alumnos_nuevos_capacitados,
+        "alumnos_nuevos_esperados": alumnos_nuevos_esperados,
+        "alumnos_nuevos_pendientes": alumnos_nuevos_pendientes,
+        "alumnos_cumplidos_total": alumnos_cumplidos_total,
+        "alumnos_porcentaje_revalidados": alumnos_porcentaje_revalidados,
+        "alumnos_porcentaje_nuevos": alumnos_porcentaje_nuevos,
+        "alumnos_porcentaje_cumplimiento": alumnos_porcentaje_cumplimiento,
         "conteo_por_modalidad": conteo_por_modalidad,
         "conteo_por_curso": conteo_por_curso,
         "por_modalidad": por_modalidad,
@@ -2169,6 +2265,93 @@ def download_alumnos_descartados():
         rows = list(reader)
 
     return make_csv_response("alumnos_descartados_menos_30_min.csv", rows, headers)
+
+
+@app.get("/admin/download/alumnos/reporte")
+@report_login_required
+@login_required
+def download_reporte_alumnos():
+    rows, users = read_report_data("alumno")
+    reporte = build_report(
+        rows,
+        users,
+        cursos_oficiales=ALUMNOS_CURSOS_OFICIALES,
+        modalidades=ALUMNOS_MODALIDADES,
+        cursos_requeridos=len(ALUMNOS_CURSOS_OFICIALES),
+        ultima_actualizacion_path=ALUMNOS_CAPACITACIONES_PATH,
+        es_reporte_alumnos=True,
+    )
+
+    personas_por_id = {
+        clean(persona.get("id")): persona
+        for persona in reporte["personas"]
+        if clean(persona.get("id"))
+    }
+    personas_por_correo = {
+        normalize_email(persona.get("correo")): persona
+        for persona in reporte["personas"]
+        if normalize_email(persona.get("correo"))
+    }
+
+    salida = []
+    for usuario in reporte["usuarios_lista"]:
+        alumno_id = clean(usuario.get("id"))
+        correo = normalize_email(usuario.get("correo"))
+        persona = personas_por_id.get(alumno_id) or personas_por_correo.get(correo)
+
+        if persona and persona.get("completo"):
+            tipo_cumplimiento = persona.get("tipo_cumplimiento", "")
+            if tipo_cumplimiento == "nuevo":
+                estado = "Completo"
+                categoria = "Capacitado nuevo"
+            elif tipo_cumplimiento == "revalidado":
+                estado = "Completo"
+                categoria = "Revalidado"
+            else:
+                estado = "Completo"
+                categoria = "Completo"
+        else:
+            tipo_cumplimiento = "pendiente"
+            estado = "Sin completar"
+            categoria = "Pendiente"
+
+        cursos = persona.get("cursos", []) if persona else []
+        curso_principal = cursos[0] if cursos else {}
+
+        salida.append({
+            "id": alumno_id,
+            "nombre": clean(usuario.get("nombre")),
+            "correo": correo,
+            "estado": estado,
+            "categoria": categoria,
+            "tipo_cumplimiento": tipo_cumplimiento,
+            "curso": curso_principal.get("curso", ALUMNOS_CURSO_OFICIAL if persona else ""),
+            "modalidad": curso_principal.get("modalidad", ""),
+            "fecha_actualizacion": persona.get("ultima_actualizacion", "") if persona else "",
+            "origen": curso_principal.get("origen", ""),
+            "observacion": curso_principal.get("observacion", ""),
+            "total_cursos": persona.get("total_cursos", 0) if persona else 0,
+            "pendientes": persona.get("pendientes", len(ALUMNOS_CURSOS_OFICIALES)) if persona else len(ALUMNOS_CURSOS_OFICIALES),
+        })
+
+    salida.sort(key=lambda item: (item["estado"] != "Sin completar", norm(item.get("nombre", ""))))
+
+    headers = [
+        "id",
+        "nombre",
+        "correo",
+        "estado",
+        "categoria",
+        "tipo_cumplimiento",
+        "curso",
+        "modalidad",
+        "fecha_actualizacion",
+        "origen",
+        "observacion",
+        "total_cursos",
+        "pendientes",
+    ]
+    return make_csv_response("reporte_alumnos_completo.csv", salida, headers)
 
 
 
