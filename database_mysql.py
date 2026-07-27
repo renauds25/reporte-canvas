@@ -37,6 +37,16 @@ from database import (
 
 BASE_DIR = Path(__file__).resolve().parent
 
+CAPACITACIONES_API_FUENTES_PERSISTENTES = {
+    "api_capacitaciones",
+    "api_capacitaciones_en_linea",
+}
+INGESTAS_API_ORIGENES_PERSISTENTES = {
+    "api_directa",
+    "api_capacitaciones",
+    "api_capacitaciones_en_linea",
+}
+
 
 def _env_bool(nombre: str, default: str = "1") -> bool:
     return os.getenv(nombre, default).strip().lower() in {"1", "true", "yes", "si", "sí"}
@@ -318,6 +328,76 @@ def inicializar_mysql(conexion) -> None:
         _crear_indice(conexion, indice)
 
 
+
+def leer_capacitaciones_api_persistentes_mysql(conexion) -> list[dict[str, Any]]:
+    try:
+        filas = ejecutar(
+            conexion,
+            """
+            SELECT
+                tipo, id_externo, nombre, correo, carrera, division, curso, modalidad,
+                fecha_actualizacion, duracion_minutos, fuente, archivo_origen
+            FROM capacitaciones
+            WHERE LOWER(COALESCE(fuente, '')) IN ('api_capacitaciones', 'api_capacitaciones_en_linea')
+            """,
+        ).mappings().all()
+        return [dict(fila) for fila in filas]
+    except Exception:
+        return []
+
+
+def leer_auxiliares_api_persistentes_mysql(conexion, tabla: str) -> list[dict[str, Any]]:
+    if tabla not in {"pendientes_revision", "descartados"}:
+        return []
+
+    try:
+        filas = ejecutar(
+            conexion,
+            f"""
+            SELECT
+                id_externo, nombre, correo, carrera, division, curso, modalidad,
+                fecha_actualizacion, duracion, minutos_num, motivo, archivo_origen, hora_unio
+            FROM {tabla}
+            WHERE tipo = 'maestro'
+              AND LOWER(COALESCE(archivo_origen, '')) LIKE 'api_capacitaciones%%'
+            """
+        ).mappings().all()
+        return [dict(fila) for fila in filas]
+    except Exception:
+        return []
+
+
+def restaurar_capacitaciones_api_persistentes_mysql(conexion, filas: list[dict[str, Any]]) -> int:
+    total = 0
+    for fila in filas:
+        upsert_capacitacion_mysql(
+            conexion,
+            tipo=fila.get("tipo") or "maestro",
+            id_externo=fila.get("id_externo") or "",
+            nombre=fila.get("nombre") or "",
+            correo=fila.get("correo") or "",
+            carrera=fila.get("carrera") or "No disponible",
+            division=fila.get("division") or "No disponible",
+            curso=fila.get("curso") or "",
+            modalidad=fila.get("modalidad") or "En línea",
+            fecha_actualizacion=fila.get("fecha_actualizacion") or "",
+            duracion_minutos=fila.get("duracion_minutos"),
+            fuente=fila.get("fuente") or "api_capacitaciones_en_linea",
+            archivo_origen=fila.get("archivo_origen") or "",
+        )
+        total += 1
+    return total
+
+
+def restaurar_auxiliares_api_persistentes_mysql(conexion, tabla: str, filas: list[dict[str, Any]]) -> int:
+    total = 0
+    for fila in filas:
+        insertar_auxiliar_mysql(conexion, tabla, tipo="maestro", fila=fila)
+        total += 1
+    return total
+
+
+
 def reiniciar_mysql(conexion) -> None:
     """Reinicia datos derivados de CSV sin borrar ingestas de API directa."""
     tablas = [
@@ -343,7 +423,7 @@ def reiniciar_mysql(conexion) -> None:
         conexion,
         """
         DELETE FROM ingestas
-        WHERE LOWER(COALESCE(origen, '')) <> 'api_directa'
+        WHERE LOWER(COALESCE(origen, '')) NOT IN ('api_directa', 'api_capacitaciones', 'api_capacitaciones_en_linea')
         """,
     )
 
@@ -763,6 +843,10 @@ def migrar_csv_a_mysql(reiniciar: bool = True) -> dict[str, int]:
     engine = crear_engine_mysql()
     with engine.begin() as conexion:
         inicializar_mysql(conexion)
+        capacitaciones_api_preservadas = leer_capacitaciones_api_persistentes_mysql(conexion) if reiniciar else []
+        pendientes_api_preservados = leer_auxiliares_api_persistentes_mysql(conexion, "pendientes_revision") if reiniciar else []
+        descartados_api_preservados = leer_auxiliares_api_persistentes_mysql(conexion, "descartados") if reiniciar else []
+
         if reiniciar:
             reiniciar_mysql(conexion)
 
@@ -782,6 +866,11 @@ def migrar_csv_a_mysql(reiniciar: bool = True) -> dict[str, int]:
             "descartados_alumnos": importar_auxiliares_mysql(conexion, ALUMNOS_DESCARTADOS_PATH, "alumno", "descartados"),
             "ingestas_meet": importar_ingestas_mysql(conexion, ALUMNOS_MEET_DESCARGADOS_PATH),
         }
+
+        resultado["capacitaciones_api_preservadas"] = restaurar_capacitaciones_api_persistentes_mysql(conexion, capacitaciones_api_preservadas)
+        resultado["pendientes_api_preservados"] = restaurar_auxiliares_api_persistentes_mysql(conexion, "pendientes_revision", pendientes_api_preservados)
+        resultado["descartados_api_preservados"] = restaurar_auxiliares_api_persistentes_mysql(conexion, "descartados", descartados_api_preservados)
+
         resultado.update({f"tabla_{tabla}": total for tabla, total in resumen_mysql(conexion).items()})
         return resultado
 
@@ -862,7 +951,7 @@ def leer_ingestas_recientes_mysql(limite: int = 12) -> list[dict[str, Any]]:
                 ingesta_key, tipo, mensaje_id, recurso_id, archivo, origen, asunto,
                 fecha_reunion, fecha_descarga, estado, detalle, creado_en, actualizado_en
             FROM ingestas
-            WHERE LOWER(COALESCE(origen, '')) = 'api_directa'
+            WHERE LOWER(COALESCE(origen, '')) IN ('api_directa', 'api_capacitaciones', 'api_capacitaciones_en_linea')
             ORDER BY actualizado_en DESC, creado_en DESC
             LIMIT :limite
             """,

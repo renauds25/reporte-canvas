@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import csv
 import hmac
+import hashlib
 import json
 import io
 import re
@@ -66,6 +67,15 @@ try:
     REMOTE_CACHE_TIMEOUT = float(os.getenv("REMOTE_CACHE_TIMEOUT", "30"))
 except ValueError:
     REMOTE_CACHE_TIMEOUT = 30.0
+
+CAPACITACIONES_API_TOKEN = (
+    os.getenv("CAPACITACIONES_API_TOKEN", "").strip()
+    or os.getenv("MAESTROS_CAPACITACIONES_API_TOKEN", "").strip()
+    or MEET_API_TOKEN
+)
+CAPACITACIONES_API_ENABLED = os.getenv("CAPACITACIONES_API_ENABLED", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
+CAPACITACIONES_API_ORIGEN = os.getenv("CAPACITACIONES_API_ORIGEN", "api_capacitaciones_en_linea").strip() or "api_capacitaciones_en_linea"
+CAPACITACIONES_API_MODALIDAD = os.getenv("CAPACITACIONES_API_MODALIDAD", "En línea").strip() or "En línea"
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 REPORT_PASSWORD = os.getenv("REPORT_PASSWORD")
@@ -779,6 +789,368 @@ def validate_meet_api_token() -> tuple[bool, str]:
         return False, "Token no autorizado."
 
     return True, ""
+
+
+
+def get_capacitaciones_api_token_from_request() -> str:
+    auth = clean(request.headers.get("Authorization", ""))
+    if auth.lower().startswith("bearer "):
+        return auth.split(" ", 1)[1].strip()
+
+    for header_name in ("X-Capacitaciones-Api-Token", "X-Maestros-Api-Token", "X-Api-Token", "X-Meet-Api-Token"):
+        value = clean(request.headers.get(header_name, ""))
+        if value:
+            return value
+
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        value = clean(data.get("token", ""))
+        if value:
+            return value
+
+    value = clean(request.form.get("token", ""))
+    if value:
+        return value
+
+    return ""
+
+
+def validate_capacitaciones_api_token() -> tuple[bool, str]:
+    if not CAPACITACIONES_API_ENABLED:
+        return False, "La API de capacitaciones está deshabilitada."
+
+    if not CAPACITACIONES_API_TOKEN:
+        return False, "Falta configurar CAPACITACIONES_API_TOKEN o MEET_API_TOKEN en variables de entorno."
+
+    supplied = get_capacitaciones_api_token_from_request()
+    if not supplied or not hmac.compare_digest(supplied, CAPACITACIONES_API_TOKEN):
+        return False, "Token no autorizado."
+
+    return True, ""
+
+
+def decode_csv_bytes(content: bytes) -> str:
+    if not content:
+        return ""
+
+    ultimo_error: Exception | None = None
+    for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin1"):
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError as exc:
+            ultimo_error = exc
+            continue
+
+    if ultimo_error:
+        raise ultimo_error
+
+    return content.decode("utf-8", errors="replace")
+
+
+def csv_text_to_rows(csv_text: str) -> list[dict[str, str]]:
+    if not clean(csv_text):
+        return []
+
+    reader = csv.DictReader(io.StringIO(csv_text))
+    return [{str(k or ""): clean(v) for k, v in row.items()} for row in reader]
+
+
+def read_capacitaciones_import_payload() -> tuple[dict[str, str], list[dict[str, Any]], bytes]:
+    metadata: dict[str, str] = {}
+    rows: list[dict[str, Any]] = []
+    content: bytes = b""
+
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        metadata = {
+            "filename": clean(data.get("filename", data.get("archivo", "capacitaciones_maestros_en_linea.csv"))),
+            "origen": clean(data.get("origen", "")) or CAPACITACIONES_API_ORIGEN,
+            "asunto": clean(data.get("subject", data.get("asunto", ""))),
+            "ingesta_id": clean(data.get("ingesta_id", data.get("message_id", data.get("mensaje_id", "")))),
+            "fecha_actualizacion": clean(data.get("fecha_actualizacion", data.get("fecha", ""))),
+        }
+
+        registros = data.get("registros")
+        if isinstance(registros, list):
+            rows = [dict(registro) for registro in registros if isinstance(registro, dict)]
+            content = json.dumps(rows, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            return metadata, rows, content
+
+        csv_base64 = clean(data.get("csv_base64", ""))
+        if csv_base64:
+            padded = csv_base64 + "=" * (-len(csv_base64) % 4)
+            content = base64.b64decode(padded.encode("utf-8"))
+        else:
+            csv_text = data.get("csv", data.get("csv_text", ""))
+            content = str(csv_text or "").encode("utf-8-sig")
+
+        rows = csv_text_to_rows(decode_csv_bytes(content))
+        return metadata, rows, content
+
+    metadata = {
+        "filename": clean(request.form.get("filename", request.form.get("archivo", "capacitaciones_maestros_en_linea.csv"))),
+        "origen": clean(request.form.get("origen", "")) or CAPACITACIONES_API_ORIGEN,
+        "asunto": clean(request.form.get("subject", request.form.get("asunto", ""))),
+        "ingesta_id": clean(request.form.get("ingesta_id", request.form.get("message_id", request.form.get("mensaje_id", "")))),
+        "fecha_actualizacion": clean(request.form.get("fecha_actualizacion", request.form.get("fecha", ""))),
+    }
+
+    uploaded_file = request.files.get("archivo") or request.files.get("file") or request.files.get("csv")
+    if uploaded_file and uploaded_file.filename:
+        metadata["filename"] = metadata["filename"] or uploaded_file.filename
+        content = uploaded_file.read()
+    else:
+        csv_base64 = clean(request.form.get("csv_base64", ""))
+        if csv_base64:
+            padded = csv_base64 + "=" * (-len(csv_base64) % 4)
+            content = base64.b64decode(padded.encode("utf-8"))
+        else:
+            content = str(request.form.get("csv", request.form.get("csv_text", "")) or "").encode("utf-8-sig")
+
+    rows = csv_text_to_rows(decode_csv_bytes(content))
+    return metadata, rows, content
+
+
+def normalizar_modalidad_capacitacion_maestro(value: Any) -> str:
+    texto_norm = norm(value)
+    if not texto_norm:
+        return CAPACITACIONES_API_MODALIDAD
+
+    if texto_norm in {"en linea", "online", "virtual", "linea"}:
+        return "En línea"
+    if texto_norm in {"a distancia", "distancia", "meet", "zoom"}:
+        return "A distancia"
+    if texto_norm in {"presencial", "presencialmente"}:
+        return "Presencial"
+
+    return clean(value) or CAPACITACIONES_API_MODALIDAD
+
+
+def normalizar_curso_capacitacion_maestro(value: Any) -> str:
+    curso = clean(value)
+    if not curso:
+        return ""
+
+    mapa = {norm(nombre): nombre for nombre in CURSOS_OFICIALES}
+    mapa[norm("CANVAS 5. FOROS DE DISCUSIÓN Y SPEEDGRADER.")] = "CANVAS 5. FOROS DE DISCUSIÓN."
+    return mapa.get(norm(curso), curso)
+
+
+def curso_maestro_es_oficial(curso: str) -> bool:
+    oficiales = {norm(nombre) for nombre in CURSOS_OFICIALES}
+    return norm(curso) in oficiales
+
+
+def preparar_registros_capacitaciones_maestros(rows: list[dict[str, Any]], metadata: dict[str, str]) -> dict[str, Any]:
+    usuarios = read_report_users("maestro")
+    by_id, by_email, by_name = build_user_indexes(users=usuarios)
+
+    validos: list[dict[str, str]] = []
+    pendientes: list[dict[str, Any]] = []
+    errores: list[dict[str, Any]] = []
+
+    fecha_default = format_date_label(metadata.get("fecha_actualizacion") or "") or mexico_now().strftime("%d/%m/%Y")
+
+    for idx, raw in enumerate(rows, start=1):
+        row = normalize_training_row(raw)
+        curso = normalizar_curso_capacitacion_maestro(row.get("curso"))
+        modalidad = normalizar_modalidad_capacitacion_maestro(row.get("modalidad"))
+        fecha_actualizacion = format_date_label(row.get("fecha_actualizacion") or fecha_default) or fecha_default
+
+        if not curso:
+            errores.append({
+                "fila": idx,
+                "motivo": "curso_faltante",
+                "nombre": row.get("nombre", ""),
+                "correo": row.get("correo", ""),
+            })
+            continue
+
+        if not curso_maestro_es_oficial(curso):
+            pendientes.append({
+                "id": row.get("id", ""),
+                "nombre": row.get("nombre", ""),
+                "correo": normalize_email(row.get("correo")),
+                "carrera": row.get("carrera", "") or "No disponible",
+                "division": row.get("division", "") or "No disponible",
+                "curso": curso,
+                "modalidad": modalidad,
+                "fecha_actualizacion": fecha_actualizacion,
+                "duracion": "",
+                "minutos_num": "",
+                "motivo": "curso_no_oficial",
+                "archivo_origen": metadata.get("filename", ""),
+                "hora_unio": "",
+            })
+            continue
+
+        _, user, match_type = resolve_person(row, by_id, by_email, by_name)
+        if not user:
+            pendientes.append({
+                "id": row.get("id", ""),
+                "nombre": row.get("nombre", ""),
+                "correo": normalize_email(row.get("correo")),
+                "carrera": row.get("carrera", "") or "No disponible",
+                "division": row.get("division", "") or "No disponible",
+                "curso": curso,
+                "modalidad": modalidad,
+                "fecha_actualizacion": fecha_actualizacion,
+                "duracion": "",
+                "minutos_num": "",
+                "motivo": "sin_coincidencia_base_maestros",
+                "archivo_origen": metadata.get("filename", ""),
+                "hora_unio": "",
+            })
+            continue
+
+        validos.append({
+            "id": user.get("id", "") or row.get("id", ""),
+            "nombre": user.get("nombre", "") or row.get("nombre", ""),
+            "correo": normalize_email(user.get("correo", "") or row.get("correo", "")),
+            "carrera": user.get("carrera", "") or row.get("carrera", "") or "No disponible",
+            "division": user.get("division", "") or row.get("division", "") or "No disponible",
+            "curso": curso,
+            "modalidad": modalidad,
+            "fecha_actualizacion": fecha_actualizacion,
+            "origen": metadata.get("origen") or CAPACITACIONES_API_ORIGEN,
+            "observacion": f"Importado por API de capacitaciones ({match_type})",
+        })
+
+    return {
+        "recibidos": len(rows),
+        "validos": validos,
+        "pendientes": pendientes,
+        "errores": errores,
+    }
+
+
+def registrar_ingesta_capacitaciones_mysql(conexion, *, ingesta_key: str, metadata: dict[str, str], estado: str, detalle: str) -> None:
+    from database_mysql import ejecutar
+
+    ahora = mexico_now().strftime("%Y-%m-%d %H:%M:%S")
+    ejecutar(
+        conexion,
+        """
+        INSERT INTO ingestas (
+            ingesta_key, tipo, mensaje_id, recurso_id, archivo, origen, asunto,
+            fecha_reunion, fecha_descarga, estado, detalle, creado_en, actualizado_en
+        ) VALUES (
+            :ingesta_key, :tipo, :mensaje_id, :recurso_id, :archivo, :origen, :asunto,
+            :fecha_reunion, :fecha_descarga, :estado, :detalle, :creado_en, :actualizado_en
+        )
+        ON DUPLICATE KEY UPDATE
+            estado = VALUES(estado),
+            detalle = VALUES(detalle),
+            actualizado_en = VALUES(actualizado_en)
+        """,
+        {
+            "ingesta_key": ingesta_key,
+            "tipo": "maestros",
+            "mensaje_id": metadata.get("ingesta_id", ""),
+            "recurso_id": "api_capacitaciones",
+            "archivo": metadata.get("filename", ""),
+            "origen": metadata.get("origen") or CAPACITACIONES_API_ORIGEN,
+            "asunto": metadata.get("asunto", ""),
+            "fecha_reunion": "",
+            "fecha_descarga": mexico_now_label(),
+            "estado": estado,
+            "detalle": detalle,
+            "creado_en": ahora,
+            "actualizado_en": ahora,
+        },
+    )
+
+
+def importar_capacitaciones_maestros_api(metadata: dict[str, str], rows: list[dict[str, Any]], content: bytes) -> dict[str, Any]:
+    if not database_url_configurada():
+        raise RuntimeError("La API de capacitaciones requiere una base de datos configurada.")
+
+    filename = clean(metadata.get("filename", "")) or "capacitaciones_maestros_en_linea.csv"
+    if not filename.lower().endswith(".csv"):
+        filename = f"{Path(filename).stem or 'capacitaciones_maestros_en_linea'}.csv"
+    metadata["filename"] = secure_filename(filename) or "capacitaciones_maestros_en_linea.csv"
+    metadata["origen"] = clean(metadata.get("origen")) or CAPACITACIONES_API_ORIGEN
+    metadata["archivo_origen_db"] = f"{metadata['origen']}:{metadata['filename']}"
+
+    content_hash = hashlib.sha256(content or json.dumps(rows, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+    ingesta_key = f"api_capacitaciones:{metadata.get('ingesta_id') or content_hash}"
+
+    preparados = preparar_registros_capacitaciones_maestros(rows, metadata)
+    detalle = {
+        "recibidos": preparados["recibidos"],
+        "validos": len(preparados["validos"]),
+        "pendientes": len(preparados["pendientes"]),
+        "errores": len(preparados["errores"]),
+    }
+
+    from database_mysql import (
+        crear_engine_mysql,
+        ejecutar,
+        inicializar_mysql,
+        insertar_auxiliar_mysql,
+        upsert_capacitacion_mysql,
+    )
+
+    engine = crear_engine_mysql()
+    with engine.begin() as conexion:
+        inicializar_mysql(conexion)
+
+        ejecutar(
+            conexion,
+            "DELETE FROM pendientes_revision WHERE tipo = 'maestro' AND archivo_origen = :archivo",
+            {"archivo": metadata["archivo_origen_db"]},
+        )
+
+        for fila in preparados["validos"]:
+            upsert_capacitacion_mysql(
+                conexion,
+                tipo="maestro",
+                id_externo=fila.get("id", ""),
+                nombre=fila.get("nombre", ""),
+                correo=fila.get("correo", ""),
+                carrera=fila.get("carrera", ""),
+                division=fila.get("division", ""),
+                curso=fila.get("curso", ""),
+                modalidad=fila.get("modalidad", "En línea"),
+                fecha_actualizacion=fila.get("fecha_actualizacion", ""),
+                fuente=metadata["origen"],
+                archivo_origen=metadata["archivo_origen_db"],
+            )
+
+        for fila in preparados["pendientes"]:
+            fila["archivo_origen"] = metadata["archivo_origen_db"]
+            insertar_auxiliar_mysql(conexion, "pendientes_revision", tipo="maestro", fila=fila)
+
+        estado = "procesado" if not preparados["errores"] else "procesado_con_observaciones"
+        registrar_ingesta_capacitaciones_mysql(
+            conexion,
+            ingesta_key=ingesta_key,
+            metadata=metadata,
+            estado=estado,
+            detalle=json.dumps(detalle, ensure_ascii=False),
+        )
+
+    try:
+        cache = regenerate_report_cache_for_tipo("maestro")
+    except Exception as exc:
+        cache = {
+            "cache_enabled": REPORT_CACHE_ENABLED,
+            "error": f"No se pudo regenerar cache maestros: {exc}",
+        }
+
+    return {
+        "ok": True,
+        "tipo": "maestros",
+        "origen": metadata["origen"],
+        "filename": metadata["filename"],
+        "ingesta_key": ingesta_key,
+        "recibidos": preparados["recibidos"],
+        "validos": len(preparados["validos"]),
+        "pendientes": len(preparados["pendientes"]),
+        "errores": preparados["errores"],
+        "cache": cache,
+    }
+
 
 
 def read_direct_meet_upload_payload() -> tuple[dict[str, str], bytes]:
@@ -2060,6 +2432,38 @@ def api_meet_asistencia_directa():
         return jsonify({"ok": False, "error": f"No se pudo procesar la asistencia: {exc}"}), 500
 
     return jsonify(resultado)
+
+
+
+@app.post("/api/maestros/capacitaciones/importar")
+def api_maestros_capacitaciones_importar():
+    authorized, error = validate_capacitaciones_api_token()
+    if not authorized:
+        status_code = 503 if "Falta configurar" in error or "deshabilitada" in error else 401
+        return jsonify({"ok": False, "error": error}), status_code
+
+    try:
+        metadata, rows, content = read_capacitaciones_import_payload()
+        if not rows:
+            return jsonify({"ok": False, "error": "No se recibieron registros para importar."}), 400
+
+        resultado = importar_capacitaciones_maestros_api(metadata, rows, content)
+        return jsonify(resultado)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"No se pudieron importar capacitaciones de maestros: {exc}"}), 500
+
+
+@app.get("/api/maestros/capacitaciones/health")
+def api_maestros_capacitaciones_health():
+    return jsonify({
+        "ok": True,
+        "api_capacitaciones_habilitada": CAPACITACIONES_API_ENABLED,
+        "token_configurado": bool(CAPACITACIONES_API_TOKEN),
+        "backend": "mysql" if database_url_configurada() else "sqlite",
+        "modalidad_default": CAPACITACIONES_API_MODALIDAD,
+        "origen_default": CAPACITACIONES_API_ORIGEN,
+    })
+
 
 
 @app.get("/api/meet/health")
