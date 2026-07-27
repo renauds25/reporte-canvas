@@ -1260,7 +1260,7 @@ def process_direct_meet_upload(metadata: dict[str, str], content: bytes) -> dict
         }])
 
     try:
-        resultado_bd = sincronizar_bd_meet_api_ligero(tipo)
+        resultado_bd = sincronizar_bd_meet_api_ligero(tipo, resultado=resultado)
         advertencia_bd = ""
     except Exception as exc:
         resultado_bd = {
@@ -1269,13 +1269,15 @@ def process_direct_meet_upload(metadata: dict[str, str], content: bytes) -> dict
         }
         advertencia_bd = resultado_bd["error"]
 
+    resultado_publico = {key: value for key, value in resultado.items() if not key.startswith("_")}
+
     response_payload = {
         "ok": True,
         "duplicado": False,
         "tipo": tipo,
         "archivo": saved_path.name,
         "fecha_reunion": fecha_reunion,
-        "resultado": resultado,
+        "resultado": resultado_publico,
         "bd": resultado_bd,
     }
     if advertencia_bd:
@@ -1475,6 +1477,8 @@ def process_meet_csv_batch(
                     "fecha_actualizacion": fecha,
                     "duracion": duracion_texto,
                     "minutos_num": "" if minutos is None else round(minutos, 2),
+                    "archivo_origen": source_path.name,
+                    "hora_unio": clean(meet_row.get("hora_unio", "")),
                 }
 
                 if not correo:
@@ -1500,6 +1504,10 @@ def process_meet_csv_batch(
                     "curso": curso,
                     "modalidad": "A distancia",
                     "fecha_actualizacion": fecha,
+                    "duracion": duracion_texto,
+                    "minutos_num": "" if minutos is None else round(minutos, 2),
+                    "archivo_origen": source_path.name,
+                    "origen": "api_directa",
                 })
 
     all_rows = deduplicate_training_rows(existing_rows + nuevos)
@@ -1528,6 +1536,10 @@ def process_meet_csv_batch(
         "pendientes": len(pendientes),
         "descartados": len(descartados),
         "total_capacitaciones": len(all_rows),
+        "_validos_registros": nuevos,
+        "_pendientes_registros": pendientes,
+        "_descartados_registros": descartados,
+        "_archivos_origen": [source_path.name for source_path, _ in source_files],
     }
 
 
@@ -1626,6 +1638,11 @@ def process_meet_maestros_csv_batch(
                         "curso": horario["curso"],
                         "modalidad": horario["modalidad"],
                         "fecha_actualizacion": horario.get("fecha_label", fecha),
+                        "duracion": duracion_texto,
+                        "minutos_num": "" if minutos is None else round(minutos, 2),
+                        "archivo_origen": source_path.name,
+                        "hora_unio": hora_unio,
+                        "origen": "api_directa",
                     })
             processed_paths.append(source_path)
         except UnicodeDecodeError:
@@ -1670,6 +1687,10 @@ def process_meet_maestros_csv_batch(
         "pendientes_maestros": len(pendientes),
         "descartados_maestros": len(descartados),
         "total_capacitaciones_maestros": len(all_rows),
+        "_validos_registros": nuevos,
+        "_pendientes_registros": pendientes,
+        "_descartados_registros": descartados,
+        "_archivos_origen": [path.name for path in processed_paths],
     }
 
 def process_meet_csv(
@@ -1974,46 +1995,146 @@ def regenerar_cache_remoto_si_configurado() -> dict[str, Any]:
 
 
 
-def sincronizar_bd_meet_api_ligero(tipo: str) -> dict[str, Any]:
+def parse_float_safe(value: Any) -> float | None:
+    texto = clean(value).replace(",", ".")
+    if not texto:
+        return None
+    try:
+        return float(texto)
+    except ValueError:
+        return None
+
+
+def sincronizar_bd_meet_api_ligero(tipo: str, resultado: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Actualiza MySQL con solo la ingesta recién recibida por API.
+
+    Antes esta función reimportaba el CSV completo de capacitaciones dentro de
+    la llamada /api/meet/asistencia. En Render Free + Azure MySQL eso podía
+    tardar demasiado y provocar WORKER TIMEOUT. Ahora usa los registros ya
+    clasificados por process_meet_*_csv_batch y solamente hace UPSERT de la
+    asistencia recibida.
+    """
     tipo_normalizado = normalize_meet_tipo(tipo)
     tipo_db = "maestro" if tipo_normalizado == "maestros" else "alumno"
+    cache_tipo = "maestro" if tipo_db == "maestro" else "alumno"
+    resultado = resultado or {}
 
     if not database_url_configurada():
-        resultado = sincronizar_bd_desde_csv()
-        resultado["modo"] = "sincronizacion_completa_sqlite"
-        return resultado
+        resultado_sync = sincronizar_bd_desde_csv()
+        resultado_sync["modo"] = "sincronizacion_completa_sqlite"
+        return resultado_sync
+
+    validos = list(resultado.get("_validos_registros") or [])
+    pendientes = list(resultado.get("_pendientes_registros") or [])
+    descartados = list(resultado.get("_descartados_registros") or [])
+    archivos_origen = sorted({clean(nombre) for nombre in (resultado.get("_archivos_origen") or []) if clean(nombre)})
+
+    # Si se llama sin registros clasificados, conservamos el comportamiento anterior
+    # como respaldo para no romper flujos manuales.
+    if not any([validos, pendientes, descartados]):
+        from database_mysql import (
+            crear_engine_mysql,
+            ejecutar,
+            importar_auxiliares_mysql,
+            importar_capacitaciones_mysql,
+            importar_ingestas_mysql,
+            inicializar_mysql,
+            resumen_mysql,
+        )
+
+        if tipo_db == "maestro":
+            capacitaciones_path = CAPACITACIONES_PATH
+            pendientes_path = MAESTROS_PENDIENTES_MEET_PATH
+            descartados_path = MAESTROS_DESCARTADOS_MEET_PATH
+        else:
+            capacitaciones_path = ALUMNOS_CAPACITACIONES_PATH
+            pendientes_path = ALUMNOS_PENDIENTES_PATH
+            descartados_path = ALUMNOS_DESCARTADOS_PATH
+
+        engine = crear_engine_mysql()
+        with engine.begin() as conexion:
+            inicializar_mysql(conexion)
+            capacitaciones = importar_capacitaciones_mysql(conexion, capacitaciones_path, tipo_db)
+            ejecutar(conexion, "DELETE FROM pendientes_revision WHERE tipo = :tipo", {"tipo": tipo_db})
+            ejecutar(conexion, "DELETE FROM descartados WHERE tipo = :tipo", {"tipo": tipo_db})
+            pendientes_total = importar_auxiliares_mysql(conexion, pendientes_path, tipo_db, "pendientes_revision")
+            descartados_total = importar_auxiliares_mysql(conexion, descartados_path, tipo_db, "descartados")
+            ingestas = importar_ingestas_mysql(conexion, ALUMNOS_MEET_PROCESADOS_PATH)
+            resumen = resumen_mysql(conexion)
+
+        try:
+            cache = regenerate_report_cache_for_tipo(cache_tipo)
+        except Exception as exc:
+            cache = {
+                "cache_enabled": REPORT_CACHE_ENABLED,
+                "error": f"No se pudo regenerar cache {cache_tipo}: {exc}",
+            }
+
+        return {
+            "ok": True,
+            "database_backend": "mysql",
+            "modo": "respaldo_csv_completo",
+            "tipo": tipo_db,
+            "capacitaciones_importadas": capacitaciones,
+            "pendientes_importados": pendientes_total,
+            "descartados_importados": descartados_total,
+            "ingestas_importadas": ingestas,
+            "tablas": resumen,
+            "cache": cache,
+        }
 
     from database_mysql import (
         crear_engine_mysql,
         ejecutar,
-        importar_auxiliares_mysql,
-        importar_capacitaciones_mysql,
         importar_ingestas_mysql,
         inicializar_mysql,
+        insertar_auxiliar_mysql,
         resumen_mysql,
+        upsert_capacitacion_mysql,
     )
-
-    if tipo_db == "maestro":
-        capacitaciones_path = CAPACITACIONES_PATH
-        pendientes_path = MAESTROS_PENDIENTES_MEET_PATH
-        descartados_path = MAESTROS_DESCARTADOS_MEET_PATH
-        cache_tipo = "maestro"
-    else:
-        capacitaciones_path = ALUMNOS_CAPACITACIONES_PATH
-        pendientes_path = ALUMNOS_PENDIENTES_PATH
-        descartados_path = ALUMNOS_DESCARTADOS_PATH
-        cache_tipo = "alumno"
 
     engine = crear_engine_mysql()
     with engine.begin() as conexion:
         inicializar_mysql(conexion)
-        capacitaciones = importar_capacitaciones_mysql(conexion, capacitaciones_path, tipo_db)
 
-        ejecutar(conexion, "DELETE FROM pendientes_revision WHERE tipo = :tipo", {"tipo": tipo_db})
-        ejecutar(conexion, "DELETE FROM descartados WHERE tipo = :tipo", {"tipo": tipo_db})
+        # Reemplazamos únicamente los pendientes/descartados de los archivos recibidos
+        # en esta llamada. Así no borramos observaciones de otras sesiones.
+        for archivo in archivos_origen:
+            ejecutar(
+                conexion,
+                "DELETE FROM pendientes_revision WHERE tipo = :tipo AND archivo_origen = :archivo",
+                {"tipo": tipo_db, "archivo": archivo},
+            )
+            ejecutar(
+                conexion,
+                "DELETE FROM descartados WHERE tipo = :tipo AND archivo_origen = :archivo",
+                {"tipo": tipo_db, "archivo": archivo},
+            )
 
-        pendientes = importar_auxiliares_mysql(conexion, pendientes_path, tipo_db, "pendientes_revision")
-        descartados = importar_auxiliares_mysql(conexion, descartados_path, tipo_db, "descartados")
+        for fila in validos:
+            upsert_capacitacion_mysql(
+                conexion,
+                tipo=tipo_db,
+                id_externo=fila.get("id", ""),
+                nombre=fila.get("nombre", ""),
+                correo=fila.get("correo", ""),
+                carrera=fila.get("carrera", "") or "No disponible",
+                division=fila.get("division", "") or "No disponible",
+                curso=fila.get("curso", ""),
+                modalidad=fila.get("modalidad", ""),
+                fecha_actualizacion=fila.get("fecha_actualizacion", ""),
+                duracion_minutos=parse_float_safe(fila.get("minutos_num", "")),
+                fuente="api_directa",
+                archivo_origen=fila.get("archivo_origen", ""),
+            )
+
+        for fila in pendientes:
+            insertar_auxiliar_mysql(conexion, "pendientes_revision", tipo=tipo_db, fila=fila)
+
+        for fila in descartados:
+            insertar_auxiliar_mysql(conexion, "descartados", tipo=tipo_db, fila=fila)
+
+        # El historial es pequeño; importarlo completo conserva compatibilidad con el panel admin.
         ingestas = importar_ingestas_mysql(conexion, ALUMNOS_MEET_PROCESADOS_PATH)
         resumen = resumen_mysql(conexion)
 
@@ -2028,12 +2149,13 @@ def sincronizar_bd_meet_api_ligero(tipo: str) -> dict[str, Any]:
     return {
         "ok": True,
         "database_backend": "mysql",
-        "modo": "incremental_meet_api",
+        "modo": "incremental_meet_api_ligero",
         "tipo": tipo_db,
-        "capacitaciones_importadas": capacitaciones,
-        "pendientes_importados": pendientes,
-        "descartados_importados": descartados,
+        "capacitaciones_importadas": len(validos),
+        "pendientes_importados": len(pendientes),
+        "descartados_importados": len(descartados),
         "ingestas_importadas": ingestas,
+        "archivos_origen": archivos_origen,
         "tablas": resumen,
         "cache": cache,
     }
