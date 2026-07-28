@@ -52,6 +52,7 @@ REPORT_CACHE_ENABLED = os.getenv("REPORT_CACHE_ENABLED", "1").strip().lower() in
 REPORT_CACHE_DIR = DATA_DIR / "cache"
 MAESTROS_REPORT_CACHE_PATH = REPORT_CACHE_DIR / "reporte_maestros.json"
 ALUMNOS_REPORT_CACHE_PATH = REPORT_CACHE_DIR / "reporte_alumnos.json"
+REPORT_UPDATE_TIMESTAMPS_PATH = REPORT_CACHE_DIR / "ultimas_actualizaciones_reportes.json"
 
 MEET_API_TOKEN = os.getenv("MEET_API_TOKEN", "").strip()
 MEET_API_DIRECT_ENABLED = os.getenv("MEET_API_DIRECT_ENABLED", "1").strip().lower() in {"1", "true", "yes", "si", "sí"}
@@ -1130,6 +1131,7 @@ def importar_capacitaciones_maestros_api(metadata: dict[str, str], rows: list[di
             detalle=json.dumps(detalle, ensure_ascii=False),
         )
 
+    set_report_update_timestamp("maestro", origen="api_capacitaciones_en_linea")
     try:
         cache = regenerate_report_cache_for_tipo("maestro")
     except Exception as exc:
@@ -1826,7 +1828,79 @@ def read_report_cache(tipo: str) -> dict[str, Any] | None:
     return None
 
 
-def stamp_report_update_label(reporte: dict[str, Any]) -> dict[str, Any]:
+def normalize_report_cache_tipo(tipo: str) -> str:
+    texto = str(tipo or "").strip().lower()
+    if texto in {"alumno", "alumnos"}:
+        return "alumno"
+    return "maestro"
+
+
+def read_report_update_timestamps() -> dict[str, Any]:
+    if not REPORT_UPDATE_TIMESTAMPS_PATH.exists():
+        return {}
+
+    try:
+        with REPORT_UPDATE_TIMESTAMPS_PATH.open("r", encoding="utf-8") as file:
+            payload = json.load(file)
+            return payload if isinstance(payload, dict) else {}
+    except Exception as exc:
+        print(f"AVISO: No se pudo leer timestamps de reporte. Detalle: {exc}", file=sys.stderr)
+        return {}
+
+
+def write_report_update_timestamps(payload: dict[str, Any]) -> None:
+    REPORT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    temp_path = REPORT_UPDATE_TIMESTAMPS_PATH.with_suffix(".tmp")
+
+    with temp_path.open("w", encoding="utf-8") as file:
+        json.dump(payload, file, ensure_ascii=False, separators=(",", ":"))
+
+    temp_path.replace(REPORT_UPDATE_TIMESTAMPS_PATH)
+
+
+def set_report_update_timestamp(tipo: str, label: str | None = None, origen: str = "actualizacion_explicita") -> str:
+    tipo_norm = normalize_report_cache_tipo(tipo)
+    label = label or mexico_now_label()
+    timestamps = read_report_update_timestamps()
+    timestamps[tipo_norm] = {
+        "label": label,
+        "origen": clean(origen) or "actualizacion_explicita",
+        "actualizado_en_iso": datetime.now(ZoneInfo("America/Mexico_City")).isoformat(timespec="seconds"),
+    }
+    write_report_update_timestamps(timestamps)
+    return label
+
+
+def get_report_update_timestamp_item(tipo: str) -> dict[str, Any]:
+    timestamps = read_report_update_timestamps()
+    item = timestamps.get(normalize_report_cache_tipo(tipo), {})
+    if isinstance(item, str):
+        return {"label": item, "origen": "actualizacion_explicita"}
+    return item if isinstance(item, dict) else {}
+
+
+def apply_report_update_timestamp(tipo: str, reporte: dict[str, Any]) -> dict[str, Any]:
+    item = get_report_update_timestamp_item(tipo)
+    label = clean(item.get("label", ""))
+    if not label:
+        return reporte
+
+    stamped = dict(reporte)
+    ultima_actualizacion_actual = clean(stamped.get("ultima_actualizacion", ""))
+
+    if not clean(stamped.get("ultima_actualizacion_datos", "")) and ultima_actualizacion_actual != label:
+        stamped["ultima_actualizacion_datos"] = ultima_actualizacion_actual
+
+    stamped["ultima_actualizacion"] = label
+    stamped["ultima_actualizacion_origen"] = clean(item.get("origen", "")) or "actualizacion_explicita"
+    return stamped
+
+
+def stamp_report_update_label(
+    reporte: dict[str, Any],
+    tipo: str | None = None,
+    origen: str = "actualizacion_explicita",
+) -> dict[str, Any]:
     """Marca el reporte con la hora real de una actualización explícita.
 
     Esta función solo debe usarse cuando sí ocurrió una acción real de
@@ -1835,12 +1909,16 @@ def stamp_report_update_label(reporte: dict[str, Any]) -> dict[str, Any]:
     porque eso haría parecer que hubo datos nuevos solo por abrir la página o
     despertar Render.
     """
+    label = mexico_now_label()
+    if tipo:
+        label = set_report_update_timestamp(tipo, label=label, origen=origen)
+
     stamped = dict(reporte)
     ultima_datos = stamped.get("ultima_actualizacion", "")
-    if ultima_datos:
+    if ultima_datos and ultima_datos != label:
         stamped["ultima_actualizacion_datos"] = ultima_datos
-    stamped["ultima_actualizacion"] = mexico_now_label()
-    stamped["ultima_actualizacion_origen"] = "actualizacion_explicita"
+    stamped["ultima_actualizacion"] = label
+    stamped["ultima_actualizacion_origen"] = clean(origen) or "actualizacion_explicita"
     return stamped
 
 
@@ -1895,11 +1973,14 @@ def get_report_payload(
     if REPORT_CACHE_ENABLED and not force_refresh:
         cached = read_report_cache(tipo)
         if cached:
+            cached = apply_report_update_timestamp(tipo, cached)
             return cached
 
     reporte = build_report_for_tipo(tipo)
     if mark_update:
-        reporte = stamp_report_update_label(reporte)
+        reporte = stamp_report_update_label(reporte, tipo=tipo)
+    else:
+        reporte = apply_report_update_timestamp(tipo, reporte)
     write_report_cache(tipo, reporte)
     return reporte
 
@@ -2062,6 +2143,7 @@ def sincronizar_bd_meet_api_ligero(tipo: str, resultado: dict[str, Any] | None =
             ingestas = importar_ingestas_mysql(conexion, ALUMNOS_MEET_PROCESADOS_PATH)
             resumen = resumen_mysql(conexion)
 
+        set_report_update_timestamp(cache_tipo, origen="api_directa_meet")
         try:
             cache = regenerate_report_cache_for_tipo(cache_tipo)
         except Exception as exc:
@@ -2138,6 +2220,7 @@ def sincronizar_bd_meet_api_ligero(tipo: str, resultado: dict[str, Any] | None =
         ingestas = importar_ingestas_mysql(conexion, ALUMNOS_MEET_PROCESADOS_PATH)
         resumen = resumen_mysql(conexion)
 
+    set_report_update_timestamp(cache_tipo, origen="api_directa_meet")
     try:
         cache = regenerate_report_cache_for_tipo(cache_tipo)
     except Exception as exc:
