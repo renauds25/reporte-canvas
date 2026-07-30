@@ -1974,7 +1974,12 @@ def build_report_for_tipo(tipo: str) -> dict[str, Any]:
             es_reporte_alumnos=True,
         )
 
-    return build_report(rows, users)
+    return build_report(
+        rows,
+        users,
+        cursos_requeridos=6,
+        cursos_para_completitud=CURSOS_OFICIALES[:6],
+    )
 
 
 def get_report_payload(
@@ -2321,10 +2326,13 @@ def build_report(
     cursos_requeridos: int | None = None,
     ultima_actualizacion_path: Path = CAPACITACIONES_PATH,
     es_reporte_alumnos: bool = False,
+    cursos_para_completitud: list[str] | None = None,
 ) -> dict[str, Any]:
     cursos_oficiales = cursos_oficiales or CURSOS_OFICIALES
     modalidades = modalidades or MODALIDADES
     cursos_requeridos = cursos_requeridos or len(cursos_oficiales)
+    cursos_para_completitud = cursos_para_completitud or cursos_oficiales[:cursos_requeridos]
+    cursos_completitud_norm = {norm(curso) for curso in cursos_para_completitud if norm(curso)}
 
     by_id, by_email, by_name = build_user_indexes(users)
 
@@ -2447,9 +2455,11 @@ def build_report(
     personas_lista = []
     for persona in personas.values():
         cursos_unicos = {curso["curso"] for curso in persona["cursos"]}
-        persona["total_cursos"] = len(cursos_unicos)
-        persona["completo"] = len(cursos_unicos) >= cursos_requeridos
-        persona["pendientes"] = max(0, cursos_requeridos - len(cursos_unicos))
+        cursos_unicos_norm = {norm(curso) for curso in cursos_unicos if norm(curso)}
+        cursos_completitud_cubiertos = cursos_completitud_norm.intersection(cursos_unicos_norm)
+        persona["total_cursos"] = len(cursos_completitud_cubiertos)
+        persona["completo"] = bool(cursos_completitud_norm) and cursos_completitud_norm.issubset(cursos_unicos_norm)
+        persona["pendientes"] = max(0, len(cursos_completitud_norm) - len(cursos_completitud_cubiertos))
         if es_reporte_alumnos:
             if persona["completo"] and persona.get("tiene_capacitacion_nueva"):
                 persona["tipo_cumplimiento"] = "nuevo"
@@ -2851,6 +2861,78 @@ def download_maestros_completos():
 
     headers = ["id", "nombre", "correo", "carrera", "division", "cursos_completados"]
     return make_csv_response("maestros_6_cursos_completos.csv", maestros_completos, headers)
+
+
+@app.get("/admin/download/maestros/canvas7")
+@report_login_required
+@login_required
+def download_maestros_canvas7():
+    rows, users = read_report_data("maestro")
+    reporte = build_report_for_tipo("maestro")
+
+    curso_canvas7 = next(
+        (curso for curso in reporte.get("cursos_oficiales", []) if clean(curso).startswith("CANVAS 7")),
+        "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA).",
+    )
+    curso_canvas7_norm = norm(curso_canvas7)
+
+    personas_por_id = {
+        clean(persona.get("id")): persona
+        for persona in reporte.get("personas", [])
+        if clean(persona.get("id"))
+    }
+    personas_por_correo = {
+        normalize_email(persona.get("correo")): persona
+        for persona in reporte.get("personas", [])
+        if normalize_email(persona.get("correo"))
+    }
+
+    salida = []
+    usuarios_base = users or reporte.get("usuarios_lista", [])
+
+    for usuario in usuarios_base:
+        usuario_id = clean(usuario.get("id"))
+        usuario_correo = normalize_email(usuario.get("correo"))
+        persona = personas_por_id.get(usuario_id) or personas_por_correo.get(usuario_correo)
+
+        registro_canvas7 = None
+        if persona:
+            for curso in persona.get("cursos", []):
+                if norm(curso.get("curso")) == curso_canvas7_norm:
+                    if not registro_canvas7 or parse_date(curso.get("fecha_actualizacion", "")) > parse_date(registro_canvas7.get("fecha_actualizacion", "")):
+                        registro_canvas7 = curso
+
+        completado = bool(registro_canvas7)
+        salida.append({
+            "id": usuario_id,
+            "nombre": clean(usuario.get("nombre")) or (clean(persona.get("nombre")) if persona else ""),
+            "correo": usuario_correo or (normalize_email(persona.get("correo")) if persona else ""),
+            "carrera": clean(usuario.get("carrera")) or (clean(persona.get("carrera")) if persona else ""),
+            "division": clean(usuario.get("division")) or (clean(persona.get("division")) if persona else ""),
+            "curso": curso_canvas7,
+            "estado": "Completo" if completado else "Pendiente",
+            "fecha_actualizacion": registro_canvas7.get("fecha_actualizacion", "") if registro_canvas7 else "",
+            "modalidad": registro_canvas7.get("modalidad", "") if registro_canvas7 else "",
+            "origen": registro_canvas7.get("origen", "") if registro_canvas7 else "",
+            "observacion": registro_canvas7.get("observacion", "") if registro_canvas7 else "",
+        })
+
+    salida.sort(key=lambda item: (item["estado"] != "Completo", norm(item.get("nombre", ""))))
+
+    headers = [
+        "id",
+        "nombre",
+        "correo",
+        "carrera",
+        "division",
+        "curso",
+        "estado",
+        "fecha_actualizacion",
+        "modalidad",
+        "origen",
+        "observacion",
+    ]
+    return make_csv_response("maestros_canvas7.csv", salida, headers)
 
 
 @app.get("/admin/download/alumnos/pendientes")

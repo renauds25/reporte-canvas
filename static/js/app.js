@@ -172,6 +172,23 @@ function parseFechaOrden(fecha) {
     return 0;
 }
 
+function esCursoCanvas7(curso) {
+    const cursoNorm = normalize(curso);
+    return cursoNorm.startsWith("canvas 7") || cursoNorm.includes("induccion para docentes");
+}
+
+function getCursosReportePrincipal() {
+    return (reporte?.cursos_oficiales || []).filter((curso) => !esCursoCanvas7(curso));
+}
+
+function getCursosPersonaReportePrincipal(persona) {
+    return (persona?.cursos || []).filter((curso) => !esCursoCanvas7(curso.curso));
+}
+
+function getTotalCursosPersonaReportePrincipal(persona) {
+    return new Set(getCursosPersonaReportePrincipal(persona).map((curso) => normalize(curso.curso))).size;
+}
+
 function getTotalParticipantesEsperados() {
     return Number(reporte?.total_usuarios_esperados) || Number(reporte?.total_personas) || TOTAL_PARTICIPANTES_FALLBACK;
 }
@@ -212,7 +229,7 @@ function renderCursoResumen() {
 
     const totalEsperado = getTotalParticipantesEsperados();
 
-    container.innerHTML = reporte.cursos_oficiales
+    container.innerHTML = getCursosReportePrincipal()
         .map((curso) => {
             const total = reporte.conteo_por_curso[curso] || 0;
             const porcentaje = totalEsperado > 0 ? (Number(total || 0) / totalEsperado) * 100 : 0;
@@ -266,7 +283,7 @@ function renderDivisionTabs() {
 }
 
 function getCourseDefinitions() {
-    const oficiales = reporte?.cursos_oficiales || [];
+    const oficiales = getCursosReportePrincipal();
     const curso1 = oficiales[0];
     const curso2 = oficiales[1];
 
@@ -292,7 +309,7 @@ function getCursoLabel(curso) {
     if (curso === TODOS_LOS_CURSOS) return "Todos";
     if (curso === CURSOS_1_Y_2) return "CANVAS 1 + CANVAS 2";
 
-    const index = (reporte.cursos_oficiales || []).indexOf(curso);
+    const index = getCursosReportePrincipal().indexOf(curso);
     return index >= 0 ? `CANVAS ${index + 1}` : curso;
 }
 
@@ -677,7 +694,7 @@ function exportarPersona(index) {
     if (!persona) return;
 
     const headers = ["id", "nombre", "carrera", "division", "curso", "modalidad", "fecha"];
-    const cursos = persona.cursos || [];
+    const cursos = getCursosPersonaReportePrincipal(persona);
     const rows = cursos.map((curso) => [
         persona.id || "",
         persona.nombre || "",
@@ -732,7 +749,13 @@ function renderSearchResults() {
 
     container.innerHTML = results
         .map(
-            (persona, index) => `
+            (persona, index) => {
+                const cursosVisibles = getCursosPersonaReportePrincipal(persona);
+                const totalCursosVisibles = getTotalCursosPersonaReportePrincipal(persona);
+                const pendienteVisible = Math.max(0, 6 - totalCursosVisibles);
+                const completoVisible = totalCursosVisibles >= 6;
+
+                return `
                 <article class="person-card">
                     <div class="person-header">
                         <div>
@@ -740,13 +763,13 @@ function renderSearchResults() {
                             <p class="muted small-note">${escapeHtml(getCarreraValue(persona.carrera))} · ${escapeHtml(getDivisionValue(persona.division))}</p>
                         </div>
                         <div class="person-actions">
-                            <span class="status ${persona.completo ? "done" : "pending"}">
-                                ${persona.completo ? "Completo" : `Número de cursos pendientes: ${persona.pendientes}`}
+                            <span class="status ${completoVisible ? "done" : "pending"}">
+                                ${completoVisible ? "Completo" : `Número de cursos pendientes: ${pendienteVisible}`}
                             </span>
-                            <button class="export-btn export-person-btn" type="button" data-index="${index}" ${(persona.cursos || []).length ? "" : "disabled"}>Exportar cursos</button>
+                            <button class="export-btn export-person-btn" type="button" data-index="${index}" ${cursosVisibles.length ? "" : "disabled"}>Exportar cursos</button>
                         </div>
                     </div>
-                    <p><strong>Cursos completados:</strong> ${persona.total_cursos} de 6</p>
+                    <p><strong>Cursos completados:</strong> ${totalCursosVisibles} de 6</p>
                     <div class="table-wrap">
                         <table>
                             <thead>
@@ -757,7 +780,7 @@ function renderSearchResults() {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${(persona.cursos || [])
+                                ${cursosVisibles
                                     .map(
                                         (curso) => `
                                             <tr>
@@ -772,7 +795,8 @@ function renderSearchResults() {
                         </table>
                     </div>
                 </article>
-            `
+            `;
+            }
         )
         .join("");
 

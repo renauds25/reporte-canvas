@@ -109,6 +109,34 @@
                         </div>
                     </div>
                 </div>
+
+                {% set canvas7 = namespace(curso='CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA).', completados=0) %}
+                {% for curso, total in reporte.conteo_por_curso.items() %}
+                    {% if curso.startswith('CANVAS 7') %}
+                        {% set canvas7.curso = curso %}
+                        {% set canvas7.completados = total %}
+                    {% endif %}
+                {% endfor %}
+                {% set total_canvas7 = reporte.total_usuarios_esperados or reporte.total_personas %}
+                {% set porcentaje_canvas7 = (canvas7.completados / total_canvas7 * 100) if total_canvas7 else 0 %}
+                <div class="admin-course7-card">
+                    <div class="admin-course7-header">
+                        <div>
+                            <h3>Avance CANVAS 7</h3>
+                            <p id="adminCanvas7Nombre" class="muted small-note">{{ canvas7.curso }}</p>
+                        </div>
+                        <div class="metric-column admin-course7-metric">
+                            <strong id="adminCanvas7Porcentaje" class="metric-value">{{ '%.0f'|format(porcentaje_canvas7) }}%</strong>
+                            <small><span id="adminCanvas7Completados">{{ canvas7.completados }}</span> de <span id="adminCanvas7Total">{{ total_canvas7 }}</span></small>
+                        </div>
+                    </div>
+                    <div class="progress-track admin-course7-track" aria-label="CANVAS 7: {{ '%.0f'|format(porcentaje_canvas7) }}%">
+                        <div id="adminCanvas7Fill" class="progress-fill" style="width: {{ [porcentaje_canvas7, 100] | min }}%"></div>
+                    </div>
+                    <div class="actions admin-course7-actions">
+                        <a class="btn secondary" href="/admin/download/maestros/canvas7">Exportar CANVAS 7</a>
+                    </div>
+                </div>
             </section>
 
             <section class="section panel">
@@ -275,6 +303,35 @@
                 </div>`;
         }
 
+        function renderAdminCanvas7(reporte) {
+            const cursos = reporte.cursos_oficiales || [];
+            const cursoCanvas7 = cursos.find((curso) => {
+                const cursoNorm = String(curso || "")
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "");
+                return cursoNorm.startsWith("canvas 7") || cursoNorm.includes("induccion para docentes");
+            }) || "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA).";
+
+            const total = Number(reporte.total_usuarios_esperados || reporte.total_personas || 0);
+            const completados = Number((reporte.conteo_por_curso || {})[cursoCanvas7] || 0);
+            const porcentaje = total ? Math.min((completados / total) * 100, 100) : 0;
+
+            const nombre = document.querySelector("#adminCanvas7Nombre");
+            const porcentajeNode = document.querySelector("#adminCanvas7Porcentaje");
+            const completadosNode = document.querySelector("#adminCanvas7Completados");
+            const totalNode = document.querySelector("#adminCanvas7Total");
+            const fill = document.querySelector("#adminCanvas7Fill");
+            const track = document.querySelector(".admin-course7-track");
+
+            if (nombre) nombre.textContent = cursoCanvas7;
+            if (porcentajeNode) porcentajeNode.textContent = `${porcentaje.toFixed(0)}%`;
+            if (completadosNode) completadosNode.textContent = adminFormatNumber(completados);
+            if (totalNode) totalNode.textContent = adminFormatNumber(total);
+            if (fill) fill.style.width = `${porcentaje}%`;
+            if (track) track.setAttribute("aria-label", `CANVAS 7: ${porcentaje.toFixed(0)}%`);
+        }
+
         function updateAdminDashboard(reporte) {
             setAdminText("#adminTotalPersonas", reporte.total_personas);
             setAdminText("#adminPersonasConAvance", reporte.personas_con_avance);
@@ -300,6 +357,7 @@
             setAdminText("#adminPieCompletados", completadosCanvas12);
             setAdminText("#adminPiePendientes", pendientesCanvas12);
             renderAdminModalidades(reporte);
+            renderAdminCanvas7(reporte);
         }
 
         async function handleAdminUpload(form) {
