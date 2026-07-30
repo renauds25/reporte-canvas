@@ -1527,6 +1527,26 @@ code {
     margin-bottom: 18px;
 }
 
+
+/* Centrar filtro de carrera en la lista de alumnos */
+.alumnos-filter-panel .career-filter-group {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(800px, 100%);
+    text-align: center;
+}
+
+.alumnos-filter-panel .career-toolbar {
+    justify-content: center;
+    width: 100%;
+}
+
+.alumnos-filter-panel .career-select {
+    width: 100%;
+    text-align: center;
+    text-align-last: center;
+}
+
 .alumnos-list-toolbar {
     grid-column: 1 / -1;
     margin: 0 0 18px;
