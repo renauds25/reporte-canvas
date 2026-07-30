@@ -1509,3 +1509,70 @@ code {
     background: #eef3ff;
     color: #4f5f7d;
 }
+
+/* Reporte alumnos: lista con filtros y exportación */
+.alumnos-list-section {
+    margin-top: 30px;
+}
+
+.alumnos-list-title {
+    margin-bottom: 14px;
+}
+
+.alumnos-filter-panel {
+    margin-bottom: 18px;
+}
+
+.alumnos-list-toolbar {
+    margin: 12px 0 18px;
+}
+
+.alumnos-table-block h3 {
+    font-size: 24px;
+    line-height: 1.25;
+}
+
+.alumnos-attendance-table {
+    max-height: 520px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.alumnos-attendance-table table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.alumnos-attendance-table .col-id {
+    width: 110px;
+    white-space: nowrap;
+}
+
+.alumnos-attendance-table .col-nombre {
+    width: 34%;
+}
+
+.alumnos-attendance-table .col-carrera-alumno {
+    width: auto;
+}
+
+.alumnos-attendance-table .col-actualizacion {
+    width: 150px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.alumnos-attendance-table td.col-actualizacion,
+.alumnos-attendance-table th.col-actualizacion {
+    text-align: center;
+}
+
+@media (max-width: 980px) {
+    .alumnos-attendance-table {
+        overflow-x: auto;
+    }
+
+    .alumnos-attendance-table table {
+        min-width: 760px;
+    }
+}

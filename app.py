@@ -2609,16 +2609,19 @@ def api_datos():
 
 
 @app.get("/alumnos")
+@report_login_required
 def alumnos():
     return render_template("alumnos.html", **template_context())
 
 
 @app.get("/api/alumnos/reporte")
+@report_login_required
 def api_alumnos_reporte():
     return jsonify(get_report_payload("alumno"))
 
 
 @app.get("/api/alumnos/datos")
+@report_login_required
 def api_alumnos_datos():
     rows, users = read_report_data("alumno")
     return jsonify({

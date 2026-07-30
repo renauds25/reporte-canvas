@@ -1,5 +1,12 @@
 let reporteAlumnos = null;
 
+const ALUMNOS_TODAS_CARRERAS = "__TODAS_CARRERAS__";
+const alumnosRegistrosPorPagina = 20;
+let alumnosCarreraActiva = ALUMNOS_TODAS_CARRERAS;
+let alumnosOrdenLista = "az";
+let alumnosPaginaActual = 1;
+let busquedaAlumnosResultados = [];
+
 const formatNumber = (value) => new Intl.NumberFormat("es-MX").format(Number(value || 0));
 const normalizeText = (value) => String(value || "")
     .normalize("NFD")
@@ -29,6 +36,66 @@ function escapeHtml(value) {
 function formatPercent(value) {
     const number = Number(value || 0);
     return `${Number.isInteger(number) ? number.toFixed(0) : number.toFixed(1)}%`;
+}
+
+function cleanText(value) {
+    const text = String(value ?? "").trim();
+    const normalized = normalizeText(text);
+    if (["", "null", "none", "nan", "n/a", "na", "sin dato", "sin datos"].includes(normalized)) {
+        return "";
+    }
+    return text;
+}
+
+function getCarreraValue(value) {
+    return cleanText(value) || "No disponible";
+}
+
+function getAlumnoKey(persona) {
+    return String(persona?.id || persona?.correo || normalizeText(persona?.nombre) || "").trim();
+}
+
+function csvValue(value) {
+    return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function formatFecha(fecha) {
+    if (!fecha) return "";
+
+    const texto = String(fecha).trim();
+    if (!texto) return "";
+
+    if (texto.includes("/") && texto.includes(":")) return texto;
+    if (texto.includes("/") && !texto.includes("-")) return texto;
+
+    if (texto.includes("-")) {
+        const partes = texto.split("-");
+        if (partes.length === 3) {
+            const [anio, mes, dia] = partes;
+            return `${dia}/${mes}/${anio}`;
+        }
+    }
+
+    return texto;
+}
+
+function parseFechaOrden(fecha) {
+    if (!fecha) return 0;
+
+    const texto = String(fecha).trim();
+    const fechaSinHora = texto.split(" ")[0];
+
+    if (fechaSinHora.includes("/")) {
+        const [dia, mes, anio] = fechaSinHora.split("/").map(Number);
+        return new Date(anio, mes - 1, dia).getTime() || 0;
+    }
+
+    if (fechaSinHora.includes("-")) {
+        const [anio, mes, dia] = fechaSinHora.split("-").map(Number);
+        return new Date(anio, mes - 1, dia).getTime() || 0;
+    }
+
+    return 0;
 }
 
 function tipoCumplimientoLabel(tipo) {
@@ -112,20 +179,297 @@ function renderCurso(reporte) {
     requestAnimationFrame(initProgressScrollAnimations);
 }
 
+function getAlumnosPorKey() {
+    const map = new Map();
+    (reporteAlumnos?.personas || []).forEach((persona) => {
+        const key = getAlumnoKey(persona);
+        if (key) map.set(key, persona);
+    });
+    return map;
+}
+
+function getAlumnosBase() {
+    const alumnosPorKey = getAlumnosPorKey();
+    const usuarios = reporteAlumnos?.usuarios_lista || [];
+
+    if (usuarios.length) {
+        return usuarios.map((usuario) => {
+            const persona = alumnosPorKey.get(getAlumnoKey(usuario));
+            return {
+                id: usuario.id || persona?.id || "",
+                nombre: usuario.nombre || persona?.nombre || "Sin nombre",
+                correo: usuario.correo || persona?.correo || "",
+                carrera: getCarreraValue(usuario.carrera || persona?.carrera),
+                division: usuario.division || persona?.division || "No disponible",
+                cursos: persona?.cursos || [],
+                total_cursos: persona?.total_cursos || 0,
+                completo: Boolean(persona?.completo),
+                tipo_cumplimiento: persona?.tipo_cumplimiento || "pendiente",
+                pendientes: persona?.pendientes ?? 1,
+                ultima_actualizacion: persona?.ultima_actualizacion || "",
+            };
+        });
+    }
+
+    return (reporteAlumnos?.personas || []).map((persona) => ({
+        id: persona.id || "",
+        nombre: persona.nombre || "Sin nombre",
+        correo: persona.correo || "",
+        carrera: getCarreraValue(persona.carrera),
+        division: persona.division || "No disponible",
+        cursos: persona.cursos || [],
+        total_cursos: persona.total_cursos || 0,
+        completo: Boolean(persona.completo),
+        tipo_cumplimiento: persona.tipo_cumplimiento || "pendiente",
+        pendientes: persona.pendientes ?? 1,
+        ultima_actualizacion: persona.ultima_actualizacion || "",
+    }));
+}
+
+function esCursoRevalidado(curso) {
+    return Boolean(curso?.es_revalidacion) || normalizeText(curso?.modalidad) === "revalidado" || normalizeText(curso?.origen).includes("revalidacion");
+}
+
+function getRegistroPrincipalAlumno(alumno) {
+    const cursos = alumno?.cursos || [];
+    if (!cursos.length) return null;
+
+    const nuevos = cursos.filter((curso) => !esCursoRevalidado(curso));
+    const revalidados = cursos.filter(esCursoRevalidado);
+    const candidatos = nuevos.length ? nuevos : revalidados;
+
+    return [...candidatos].sort(
+        (a, b) => parseFechaOrden(b.fecha_actualizacion) - parseFechaOrden(a.fecha_actualizacion)
+    )[0] || null;
+}
+
+function crearFilaAlumno(alumno) {
+    const registro = getRegistroPrincipalAlumno(alumno);
+    const completado = Boolean(registro || alumno.completo);
+    const fecha = registro?.fecha_actualizacion || alumno.ultima_actualizacion || "";
+    const tipoCumplimiento = completado ? (registro && !esCursoRevalidado(registro) ? "nuevo" : alumno.tipo_cumplimiento || "revalidado") : "pendiente";
+
+    return {
+        id: alumno.id || "-",
+        nombre: alumno.nombre || "Sin nombre",
+        carrera: getCarreraValue(registro?.carrera || alumno.carrera),
+        fecha: completado ? formatFecha(fecha) : "Pendiente",
+        completado,
+        tipo_cumplimiento: tipoCumplimiento,
+        fecha_orden: parseFechaOrden(fecha),
+    };
+}
+
+function getCarrerasAlumnosDisponibles() {
+    const carreras = new Map();
+
+    getAlumnosBase().forEach((alumno) => {
+        const carrera = getCarreraValue(alumno.carrera);
+        const key = normalizeText(carrera) || normalizeText("No disponible");
+        if (!carreras.has(key)) carreras.set(key, carrera);
+    });
+
+    return Array.from(carreras.values()).sort((a, b) => {
+        if (normalizeText(a) === "no disponible") return 1;
+        if (normalizeText(b) === "no disponible") return -1;
+        return a.localeCompare(b, "es");
+    });
+}
+
+function renderAlumnosCareerFilter() {
+    const select = document.getElementById("alumnosCareerSelect");
+    if (!select || !reporteAlumnos) return;
+
+    const carreras = getCarrerasAlumnosDisponibles();
+    const carreraKeys = new Set(carreras.map((carrera) => normalizeText(carrera)));
+
+    if (alumnosCarreraActiva !== ALUMNOS_TODAS_CARRERAS && !carreraKeys.has(alumnosCarreraActiva)) {
+        alumnosCarreraActiva = ALUMNOS_TODAS_CARRERAS;
+    }
+
+    select.innerHTML = [
+        `<option value="${ALUMNOS_TODAS_CARRERAS}">Todas</option>`,
+        ...carreras.map((carrera) => {
+            const key = normalizeText(carrera);
+            return `<option value="${escapeHtml(key)}">${escapeHtml(carrera)}</option>`;
+        }),
+    ].join("");
+
+    select.value = alumnosCarreraActiva;
+}
+
+function ordenarFilasAlumnos(filas) {
+    const ordenadores = {
+        recientes: (a, b) => {
+            if (a.completado !== b.completado) return a.completado ? -1 : 1;
+            if (a.fecha_orden !== b.fecha_orden) return b.fecha_orden - a.fecha_orden;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+        id: (a, b) => {
+            const idA = Number(String(a.id || "").replace(/\D/g, ""));
+            const idB = Number(String(b.id || "").replace(/\D/g, ""));
+            if (idA && idB) return idA - idB;
+            return String(a.id || "").localeCompare(String(b.id || ""), "es", { numeric: true });
+        },
+        id_desc: (a, b) => {
+            const idA = Number(String(a.id || "").replace(/\D/g, ""));
+            const idB = Number(String(b.id || "").replace(/\D/g, ""));
+            if (idA && idB) return idB - idA;
+            return String(b.id || "").localeCompare(String(a.id || ""), "es", { numeric: true });
+        },
+        az: (a, b) => a.nombre.localeCompare(b.nombre, "es"),
+        za: (a, b) => b.nombre.localeCompare(a.nombre, "es"),
+        pendientes: (a, b) => {
+            if (a.completado !== b.completado) return a.completado ? 1 : -1;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+        completados: (a, b) => {
+            if (a.completado !== b.completado) return a.completado ? -1 : 1;
+            if (a.fecha_orden !== b.fecha_orden) return b.fecha_orden - a.fecha_orden;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+        revalidados: (a, b) => {
+            const aRevalidado = a.tipo_cumplimiento === "revalidado";
+            const bRevalidado = b.tipo_cumplimiento === "revalidado";
+            if (aRevalidado !== bRevalidado) return aRevalidado ? -1 : 1;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+        nuevos: (a, b) => {
+            const aNuevo = a.tipo_cumplimiento === "nuevo";
+            const bNuevo = b.tipo_cumplimiento === "nuevo";
+            if (aNuevo !== bNuevo) return aNuevo ? -1 : 1;
+            if (a.fecha_orden !== b.fecha_orden) return b.fecha_orden - a.fecha_orden;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+        carrera: (a, b) => {
+            const comparacionCarrera = getCarreraValue(a.carrera).localeCompare(getCarreraValue(b.carrera), "es");
+            if (comparacionCarrera !== 0) return comparacionCarrera;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
+    };
+
+    return [...filas].sort(ordenadores[alumnosOrdenLista] || ordenadores.az);
+}
+
+function getFilasAlumnos() {
+    const filas = getAlumnosBase().map(crearFilaAlumno).filter((fila) => {
+        if (alumnosCarreraActiva === ALUMNOS_TODAS_CARRERAS) return true;
+        return normalizeText(getCarreraValue(fila.carrera)) === alumnosCarreraActiva;
+    });
+
+    return ordenarFilasAlumnos(filas);
+}
+
+function getAlumnosTotalPaginas(total) {
+    return Math.ceil(total / alumnosRegistrosPorPagina) || 1;
+}
+
+function setAlumnosPagina(pagina) {
+    const totalPaginas = getAlumnosTotalPaginas(getFilasAlumnos().length);
+    alumnosPaginaActual = Math.min(Math.max(Number(pagina) || 1, 1), totalPaginas);
+    renderListaAlumnos();
+}
+
+function exportarListaAlumnos() {
+    const filas = getFilasAlumnos();
+    const headers = ["id", "nombre", "carrera", "fecha"];
+    const rows = filas.map((fila) => [fila.id, fila.nombre, fila.carrera, fila.fecha]);
+    const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const carrera = alumnosCarreraActiva === ALUMNOS_TODAS_CARRERAS ? "todas" : alumnosCarreraActiva.replace(/[^a-z0-9]+/g, "-");
+
+    link.href = url;
+    link.download = `reporte-alumnos-${carrera}-${alumnosOrdenLista}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
+function renderListaAlumnos() {
+    const container = document.getElementById("alumnosListaContent");
+    if (!container || !reporteAlumnos) return;
+
+    const filas = getFilasAlumnos();
+    const completados = filas.filter((fila) => fila.completado).length;
+    const totalPaginas = getAlumnosTotalPaginas(filas.length);
+    alumnosPaginaActual = Math.min(Math.max(alumnosPaginaActual, 1), totalPaginas);
+
+    const inicio = (alumnosPaginaActual - 1) * alumnosRegistrosPorPagina;
+    const visibles = filas.slice(inicio, inicio + alumnosRegistrosPorPagina);
+    const fin = filas.length ? Math.min(inicio + alumnosRegistrosPorPagina, filas.length) : 0;
+
+    container.innerHTML = `
+        <article class="course-block selected-course-block alumnos-table-block">
+            <div class="course-header">
+                <div>
+                    <h3>Alumnos</h3>
+                    <p class="muted small-note">Lista general del curso de alumnos, con completados y pendientes.</p>
+                </div>
+                <div class="course-actions">
+                    <span>${formatNumber(completados)} completado${completados === 1 ? "" : "s"}</span>
+                    <button id="alumnosExportBtn" class="export-btn" type="button" ${filas.length ? "" : "disabled"}>Exportar</button>
+                </div>
+            </div>
+            <div class="table-wrap selected-course-table alumnos-attendance-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-id">ID</th>
+                            <th class="col-nombre">Nombre</th>
+                            <th class="col-carrera-alumno">Carrera</th>
+                            <th class="col-actualizacion">Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${visibles.length ? visibles.map((fila) => `
+                            <tr>
+                                <td class="col-id">${escapeHtml(fila.id)}</td>
+                                <td class="col-nombre">${escapeHtml(fila.nombre)}</td>
+                                <td class="col-carrera-alumno">${escapeHtml(fila.carrera)}</td>
+                                <td class="col-actualizacion">${fila.completado ? escapeHtml(fila.fecha) : `<span class="table-status pending">${escapeHtml(fila.fecha)}</span>`}</td>
+                            </tr>
+                        `).join("") : `<tr><td colspan="4" class="muted">No hay alumnos para los filtros seleccionados.</td></tr>`}
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <span>${filas.length ? `${inicio + 1}-${fin}` : "0"} de ${formatNumber(filas.length)}</span>
+                <div>
+                    <button class="pager-btn alumnos-pager-btn" data-page="${alumnosPaginaActual - 1}" ${alumnosPaginaActual === 1 ? "disabled" : ""}>Anterior</button>
+                    <button class="pager-btn alumnos-pager-btn" data-page="${alumnosPaginaActual + 1}" ${alumnosPaginaActual === totalPaginas ? "disabled" : ""}>Siguiente</button>
+                </div>
+            </div>
+        </article>
+    `;
+
+    container.querySelectorAll(".alumnos-pager-btn").forEach((button) => {
+        button.addEventListener("click", () => setAlumnosPagina(button.dataset.page));
+    });
+
+    const exportBtn = document.getElementById("alumnosExportBtn");
+    if (exportBtn) exportBtn.addEventListener("click", exportarListaAlumnos);
+}
+
 function renderResultados(query = "") {
     const container = document.getElementById("alumnosSearchResults");
     if (!container || !reporteAlumnos) return;
 
     const q = normalizeText(query);
     if (!q) {
+        busquedaAlumnosResultados = [];
         container.innerHTML = "";
         return;
     }
 
-    const personas = (reporteAlumnos.personas || []).filter((persona) => {
+    const personas = getAlumnosBase().filter((persona) => {
         const texto = normalizeText(`${persona.id} ${persona.nombre} ${persona.correo}`);
         return texto.includes(q);
     }).slice(0, 20);
+
+    busquedaAlumnosResultados = personas;
 
     if (!personas.length) {
         container.innerHTML = `<div class="panel"><p class="muted">No se encontraron alumnos.</p></div>`;
@@ -167,7 +511,7 @@ function renderResultados(query = "") {
                                 <th>Actualización</th>
                             </tr>
                         </thead>
-                        <tbody>${rows}</tbody>
+                        <tbody>${rows || `<tr><td colspan="4">Sin cursos registrados.</td></tr>`}</tbody>
                     </table>
                 </div>
             </article>
@@ -208,12 +552,33 @@ async function cargarReporteAlumnos() {
     reporteAlumnos = await response.json();
     renderResumen(reporteAlumnos);
     renderCurso(reporteAlumnos);
+    renderAlumnosCareerFilter();
+    renderListaAlumnos();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
     const input = document.getElementById("alumnosSearchInput");
     if (input) {
         input.addEventListener("input", () => renderResultados(input.value));
+    }
+
+    const careerSelect = document.getElementById("alumnosCareerSelect");
+    if (careerSelect) {
+        careerSelect.addEventListener("change", () => {
+            alumnosCarreraActiva = careerSelect.value;
+            alumnosPaginaActual = 1;
+            renderListaAlumnos();
+        });
+    }
+
+    const sortSelect = document.getElementById("alumnosSortSelect");
+    if (sortSelect) {
+        sortSelect.value = alumnosOrdenLista;
+        sortSelect.addEventListener("change", () => {
+            alumnosOrdenLista = sortSelect.value;
+            alumnosPaginaActual = 1;
+            renderListaAlumnos();
+        });
     }
 
     try {

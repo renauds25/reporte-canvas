@@ -11,7 +11,7 @@
     <header class="hero banner-hero">
         <img class="hero-banner" src="{{ url_for('static', filename='img/banner-reporte-capacitacion.svg') }}" alt="Reporte integral de capacitaciones Canvas LMS">
         <div class="auth-pill">
-            <span>Reporte público de alumnos</span>
+            <span>Acceso con contraseña de reporte</span>
         </div>
     </header>
 
@@ -52,17 +52,6 @@
         </section>
 
         <section class="section">
-            <div class="section-title">
-                <div>
-                    <h2>Buscar alumno</h2>
-                    <p>Busca por nombre, ID o correo para ver su avance.</p>
-                </div>
-            </div>
-            <input id="alumnosSearchInput" class="search" type="search" placeholder="Ejemplo: 'Usuario', '12345' o 'correo@iest.edu.mx'">
-            <div id="alumnosSearchResults" class="search-results"></div>
-        </section>
-
-        <section class="section">
             <div class="panel course-progress-panel">
                 <div class="panel-title-row">
                     <div>
@@ -72,6 +61,55 @@
                 </div>
                 <div id="alumnosCursoResumen" class="summary-list progress-list"></div>
             </div>
+        </section>
+
+        <section class="section alumnos-list-section">
+            <div class="section-title alumnos-list-title">
+                <div>
+                    <h2>Lista de alumnos</h2>
+                    <p>Se muestran 20 registros por página.</p>
+                </div>
+            </div>
+
+            <div class="alumnos-filter-panel">
+                <div class="filter-group career-filter-group">
+                    <p class="filter-label">Carrera</p>
+                    <div class="career-toolbar">
+                        <select id="alumnosCareerSelect" class="search sort-select career-select" aria-label="Filtrar alumnos por carrera">
+                            <option value="__TODAS_CARRERAS__">Todas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="list-toolbar alumnos-list-toolbar">
+                    <label for="alumnosSortSelect">Ordenar por</label>
+                    <select id="alumnosSortSelect" class="sort-select" aria-label="Ordenar lista de alumnos">
+                        <option value="az">Alfabético A-Z</option>
+                        <option value="za">Alfabético Z-A</option>
+                        <option value="recientes">Más recientes primero</option>
+                        <option value="id">ID menor a mayor</option>
+                        <option value="id_desc">ID mayor a menor</option>
+                        <option value="pendientes">Pendientes primero</option>
+                        <option value="completados">Completados primero</option>
+                        <option value="revalidados">Revalidados primero</option>
+                        <option value="nuevos">Capacitados nuevos primero</option>
+                        <option value="carrera">Carrera</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="alumnosListaContent"></div>
+        </section>
+
+        <section class="section">
+            <div class="section-title">
+                <div>
+                    <h2>Buscar alumno</h2>
+                    <p>Busca por nombre, ID o correo para ver su avance.</p>
+                </div>
+            </div>
+            <input id="alumnosSearchInput" class="search" type="search" placeholder="Ejemplo: 'Usuario', '12345' o 'correo@iest.edu.mx'">
+            <div id="alumnosSearchResults" class="search-results"></div>
         </section>
     </main>
 
