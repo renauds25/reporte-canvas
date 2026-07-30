@@ -2935,36 +2935,129 @@ def download_maestros_canvas7():
     return make_csv_response("maestros_canvas7.csv", salida, headers)
 
 
+AUXILIARES_DOWNLOAD_HEADERS = [
+    "id",
+    "nombre",
+    "correo",
+    "carrera",
+    "division",
+    "curso",
+    "modalidad",
+    "fecha_actualizacion",
+    "duracion",
+    "minutos_num",
+    "archivo_origen",
+    "hora_unio",
+    "motivo",
+]
+
+
+def normalizar_tipo_auxiliar(tipo: str) -> tuple[str, str]:
+    tipo_limpio = clean(tipo).lower()
+    if tipo_limpio in {"maestros", "maestro"}:
+        return "maestro", "maestros"
+    if tipo_limpio in {"alumnos", "alumno"}:
+        return "alumno", "alumnos"
+    return tipo_limpio, tipo_limpio
+
+
+def read_auxiliares_from_db(tabla: str, tipo: str) -> list[dict[str, Any]] | None:
+    if tabla not in {"pendientes_revision", "descartados"}:
+        return None
+
+    if not database_available_for_reports() or not database_url_configurada():
+        return None
+
+    tipo_a, tipo_b = normalizar_tipo_auxiliar(tipo)
+
+    try:
+        from database_mysql import crear_engine_mysql, ejecutar, inicializar_mysql
+
+        engine = crear_engine_mysql()
+        with engine.connect() as conexion:
+            inicializar_mysql(conexion)
+            filas = ejecutar(
+                conexion,
+                f"""
+                SELECT
+                    id_externo, nombre, correo, carrera, division, curso, modalidad,
+                    fecha_actualizacion, duracion, minutos_num, archivo_origen, hora_unio, motivo, creado_en
+                FROM {tabla}
+                WHERE tipo IN (:tipo_a, :tipo_b)
+                ORDER BY creado_en DESC, archivo_origen DESC, nombre ASC
+                """,
+                {"tipo_a": tipo_a, "tipo_b": tipo_b},
+            ).mappings().all()
+
+        return [
+            {
+                "id": clean(fila.get("id_externo", "")),
+                "nombre": clean(fila.get("nombre", "")),
+                "correo": normalize_email(fila.get("correo", "")),
+                "carrera": clean(fila.get("carrera", "")) or "No disponible",
+                "division": clean(fila.get("division", "")) or "No disponible",
+                "curso": clean(fila.get("curso", "")),
+                "modalidad": clean(fila.get("modalidad", "")),
+                "fecha_actualizacion": format_date_label(fila.get("fecha_actualizacion", "")) if clean(fila.get("fecha_actualizacion", "")) else "",
+                "duracion": clean(fila.get("duracion", "")),
+                "minutos_num": clean(fila.get("minutos_num", "")),
+                "archivo_origen": clean(fila.get("archivo_origen", "")),
+                "hora_unio": clean(fila.get("hora_unio", "")),
+                "motivo": clean(fila.get("motivo", "")),
+            }
+            for fila in filas
+        ]
+    except Exception as exc:
+        print(f"AVISO: No se pudieron leer auxiliares desde BD. Usando CSV. Detalle: {exc}", file=sys.stderr)
+        return None
+
+
+def read_auxiliares_csv(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        return list(reader)
+
+
+def download_auxiliares_csv_response(
+    *,
+    filename: str,
+    tabla: str,
+    tipo: str,
+    fallback_path: Path,
+    headers: list[str] | None = None,
+) -> Response:
+    headers = headers or AUXILIARES_DOWNLOAD_HEADERS
+    rows = read_auxiliares_from_db(tabla, tipo)
+    if rows is None:
+        rows = read_auxiliares_csv(fallback_path)
+    return make_csv_response(filename, rows, headers)
+
+
 @app.get("/admin/download/alumnos/pendientes")
 @report_login_required
 @login_required
 def download_alumnos_pendientes():
-    headers = ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "duracion", "minutos_num", "motivo"]
-
-    if not ALUMNOS_PENDIENTES_PATH.exists():
-        return make_csv_response("alumnos_pendientes_revision.csv", [], headers)
-
-    with ALUMNOS_PENDIENTES_PATH.open("r", encoding="utf-8-sig", newline="") as file:
-        reader = csv.DictReader(file)
-        rows = list(reader)
-
-    return make_csv_response("alumnos_pendientes_revision.csv", rows, headers)
+    return download_auxiliares_csv_response(
+        filename="alumnos_pendientes_revision.csv",
+        tabla="pendientes_revision",
+        tipo="alumno",
+        fallback_path=ALUMNOS_PENDIENTES_PATH,
+    )
 
 
 @app.get("/admin/download/alumnos/descartados")
 @report_login_required
 @login_required
 def download_alumnos_descartados():
-    headers = ["id", "nombre", "correo", "curso", "modalidad", "fecha_actualizacion", "duracion", "minutos_num", "motivo"]
-
-    if not ALUMNOS_DESCARTADOS_PATH.exists():
-        return make_csv_response("alumnos_descartados_menos_30_min.csv", [], headers)
-
-    with ALUMNOS_DESCARTADOS_PATH.open("r", encoding="utf-8-sig", newline="") as file:
-        reader = csv.DictReader(file)
-        rows = list(reader)
-
-    return make_csv_response("alumnos_descartados_menos_30_min.csv", rows, headers)
+    return download_auxiliares_csv_response(
+        filename="alumnos_descartados_menos_30_min.csv",
+        tabla="descartados",
+        tipo="alumno",
+        fallback_path=ALUMNOS_DESCARTADOS_PATH,
+    )
 
 
 @app.get("/admin/download/alumnos/reporte")
@@ -3055,94 +3148,28 @@ def download_reporte_alumnos():
 
 
 
-def read_meet_auxiliares_from_db(tabla: str, tipo: str = "maestro") -> list[dict[str, Any]] | None:
-    if tabla not in {"pendientes_revision", "descartados"}:
-        return None
-
-    if not database_available_for_reports() or not database_url_configurada():
-        return None
-
-    try:
-        from database_mysql import crear_engine_mysql, ejecutar, inicializar_mysql
-
-        engine = crear_engine_mysql()
-        with engine.connect() as conexion:
-            inicializar_mysql(conexion)
-            filas = ejecutar(
-                conexion,
-                f"""
-                SELECT
-                    id_externo, nombre, correo, carrera, division, curso, modalidad,
-                    fecha_actualizacion, duracion, minutos_num, archivo_origen, hora_unio, motivo, creado_en
-                FROM {tabla}
-                WHERE tipo = :tipo
-                ORDER BY creado_en DESC, archivo_origen DESC, nombre ASC
-                """,
-                {"tipo": tipo},
-            ).mappings().all()
-
-        return [
-            {
-                "id": clean(fila.get("id_externo", "")),
-                "nombre": clean(fila.get("nombre", "")),
-                "correo": normalize_email(fila.get("correo", "")),
-                "carrera": clean(fila.get("carrera", "")) or "No disponible",
-                "division": clean(fila.get("division", "")) or "No disponible",
-                "curso": clean(fila.get("curso", "")),
-                "modalidad": clean(fila.get("modalidad", "")),
-                "fecha_actualizacion": format_date_label(fila.get("fecha_actualizacion", "")) if clean(fila.get("fecha_actualizacion", "")) else "",
-                "duracion": clean(fila.get("duracion", "")),
-                "minutos_num": clean(fila.get("minutos_num", "")),
-                "archivo_origen": clean(fila.get("archivo_origen", "")),
-                "hora_unio": clean(fila.get("hora_unio", "")),
-                "motivo": clean(fila.get("motivo", "")),
-            }
-            for fila in filas
-        ]
-    except Exception as exc:
-        print(f"AVISO: No se pudieron leer auxiliares Meet desde BD. Usando CSV. Detalle: {exc}", file=sys.stderr)
-        return None
-
-
-def read_auxiliares_csv(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-
-    with path.open("r", encoding="utf-8-sig", newline="") as file:
-        reader = csv.DictReader(file)
-        return list(reader)
-
-
 @app.get("/admin/download/maestros/meet-pendientes")
 @report_login_required
 @login_required
 def download_maestros_meet_pendientes():
-    headers = [
-        "id", "nombre", "correo", "carrera", "division", "curso", "modalidad",
-        "fecha_actualizacion", "duracion", "minutos_num", "archivo_origen", "hora_unio", "motivo",
-    ]
-
-    rows = read_meet_auxiliares_from_db("pendientes_revision", "maestro")
-    if rows is None:
-        rows = read_auxiliares_csv(MAESTROS_PENDIENTES_MEET_PATH)
-
-    return make_csv_response("maestros_meet_pendientes_revision.csv", rows, headers)
+    return download_auxiliares_csv_response(
+        filename="maestros_meet_pendientes_revision.csv",
+        tabla="pendientes_revision",
+        tipo="maestro",
+        fallback_path=MAESTROS_PENDIENTES_MEET_PATH,
+    )
 
 
 @app.get("/admin/download/maestros/meet-descartados")
 @report_login_required
 @login_required
 def download_maestros_meet_descartados():
-    headers = [
-        "id", "nombre", "correo", "carrera", "division", "curso", "modalidad",
-        "fecha_actualizacion", "duracion", "minutos_num", "archivo_origen", "hora_unio", "motivo",
-    ]
-
-    rows = read_meet_auxiliares_from_db("descartados", "maestro")
-    if rows is None:
-        rows = read_auxiliares_csv(MAESTROS_DESCARTADOS_MEET_PATH)
-
-    return make_csv_response("maestros_meet_descartados_menos_30_min.csv", rows, headers)
+    return download_auxiliares_csv_response(
+        filename="maestros_meet_descartados_menos_30_min.csv",
+        tabla="descartados",
+        tipo="maestro",
+        fallback_path=MAESTROS_DESCARTADOS_MEET_PATH,
+    )
 
 
 @app.post("/admin/logout")

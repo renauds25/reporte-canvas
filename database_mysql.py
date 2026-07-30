@@ -57,6 +57,21 @@ CAPACITACIONES_API_FUENTES_SQL = _sql_lista_texto(CAPACITACIONES_API_FUENTES_PER
 INGESTAS_API_ORIGENES_SQL = _sql_lista_texto(INGESTAS_API_ORIGENES_PERSISTENTES)
 
 
+# Los archivos generados por la API directa se guardan con nombres como:
+# 20260730_181109_api_meet_maestros_....csv
+# Por eso no basta con buscar prefijo api_; también hay que conservar
+# nombres que contengan _api_ o api_meet.
+AUXILIARES_API_ARCHIVO_WHERE = """
+(
+    LOWER(COALESCE(archivo_origen, '')) LIKE 'api_%%'
+    OR LOWER(COALESCE(archivo_origen, '')) LIKE '%%_api_%%'
+    OR LOWER(COALESCE(archivo_origen, '')) LIKE '%%api_meet%%'
+    OR LOWER(COALESCE(archivo_origen, '')) LIKE '%%api_directa%%'
+    OR LOWER(COALESCE(archivo_origen, '')) LIKE '%%direct_csv%%'
+)
+"""
+
+
 def _env_bool(nombre: str, default: str = "1") -> bool:
     return os.getenv(nombre, default).strip().lower() in {"1", "true", "yes", "si", "sí"}
 
@@ -364,10 +379,10 @@ def leer_auxiliares_api_persistentes_mysql(conexion, tabla: str) -> list[dict[st
             conexion,
             f"""
             SELECT
-                id_externo, nombre, correo, carrera, division, curso, modalidad,
+                tipo, id_externo, nombre, correo, carrera, division, curso, modalidad,
                 fecha_actualizacion, duracion, minutos_num, motivo, archivo_origen, hora_unio
             FROM {tabla}
-            WHERE LOWER(COALESCE(archivo_origen, '')) LIKE 'api_%%'
+            WHERE {AUXILIARES_API_ARCHIVO_WHERE}
             """
         ).mappings().all()
         return [dict(fila) for fila in filas]
@@ -400,7 +415,8 @@ def restaurar_capacitaciones_api_persistentes_mysql(conexion, filas: list[dict[s
 def restaurar_auxiliares_api_persistentes_mysql(conexion, tabla: str, filas: list[dict[str, Any]]) -> int:
     total = 0
     for fila in filas:
-        insertar_auxiliar_mysql(conexion, tabla, tipo="maestro", fila=fila)
+        tipo = fila.get("tipo") or "maestro"
+        insertar_auxiliar_mysql(conexion, tabla, tipo=tipo, fila=fila)
         total += 1
     return total
 
@@ -448,13 +464,13 @@ def limpiar_datos_csv_mysql(conexion) -> None:
             """,
         )
 
-        # Pendientes/descartados generados por API directa usan archivo_origen con prefijo api_.
+        # Pendientes/descartados generados por API directa usan archivo_origen con api_ o _api_meet_.
         for tabla in ["pendientes_revision", "descartados"]:
             ejecutar(
                 conexion,
                 f"""
                 DELETE FROM {tabla}
-                WHERE LOWER(COALESCE(archivo_origen, '')) NOT LIKE 'api_%%'
+                WHERE NOT {AUXILIARES_API_ARCHIVO_WHERE}
                 """,
             )
     finally:
@@ -972,18 +988,18 @@ def migrar_csv_a_mysql(reiniciar: bool = True) -> dict[str, int]:
             ).scalar_one()
             resultado["pendientes_api_preservados"] = ejecutar(
                 conexion,
-                """
+                f"""
                 SELECT COUNT(*)
                 FROM pendientes_revision
-                WHERE LOWER(COALESCE(archivo_origen, '')) LIKE 'api_%%'
+                WHERE {AUXILIARES_API_ARCHIVO_WHERE}
                 """,
             ).scalar_one()
             resultado["descartados_api_preservados"] = ejecutar(
                 conexion,
-                """
+                f"""
                 SELECT COUNT(*)
                 FROM descartados
-                WHERE LOWER(COALESCE(archivo_origen, '')) LIKE 'api_%%'
+                WHERE {AUXILIARES_API_ARCHIVO_WHERE}
                 """,
             ).scalar_one()
 
