@@ -1058,6 +1058,11 @@ code {
     height: 14px;
 }
 
+
+.admin-course7-track .progress-fill {
+    transform: scaleX(1);
+}
+
 .selected-course-table .col-carrera,
 .selected-course-table td.col-carrera,
 .selected-course-table th.col-carrera {

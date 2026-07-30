@@ -119,6 +119,7 @@
                 {% endfor %}
                 {% set total_canvas7 = reporte.total_usuarios_esperados or reporte.total_personas %}
                 {% set porcentaje_canvas7 = (canvas7.completados / total_canvas7 * 100) if total_canvas7 else 0 %}
+                {% set ancho_canvas7 = 100 if porcentaje_canvas7 > 100 else porcentaje_canvas7 %}
                 <div class="admin-course7-card">
                     <div class="admin-course7-header">
                         <div>
@@ -131,7 +132,7 @@
                         </div>
                     </div>
                     <div class="progress-track admin-course7-track" aria-label="CANVAS 7: {{ '%.0f'|format(porcentaje_canvas7) }}%">
-                        <div id="adminCanvas7Fill" class="progress-fill" style="width: {{ [porcentaje_canvas7, 100] | min }}%"></div>
+                        <div id="adminCanvas7Fill" class="progress-fill" style="width: {{ ancho_canvas7 }}%"></div>
                     </div>
                     <div class="actions admin-course7-actions">
                         <a class="btn secondary" href="/admin/download/maestros/canvas7">Exportar CANVAS 7</a>
