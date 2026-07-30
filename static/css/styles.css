@@ -1520,11 +1520,20 @@ code {
 }
 
 .alumnos-filter-panel {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(180px, 260px);
+    gap: 14px 18px;
+    align-items: end;
     margin-bottom: 18px;
 }
 
 .alumnos-list-toolbar {
-    margin: 12px 0 18px;
+    grid-column: 1 / -1;
+    margin: 0 0 18px;
+}
+
+.type-filter-group .type-select {
+    width: 100%;
 }
 
 .alumnos-table-block h3 {
@@ -1556,6 +1565,25 @@ code {
     width: auto;
 }
 
+.alumnos-attendance-table .col-tipo-alumno {
+    width: 170px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.alumnos-attendance-table td.col-tipo-alumno,
+.alumnos-attendance-table th.col-tipo-alumno {
+    text-align: center;
+}
+
+.alumnos-attendance-table .col-tipo-alumno .badge {
+    display: inline-flex;
+    min-width: 112px;
+    justify-content: center;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
 .alumnos-attendance-table .col-actualizacion {
     width: 150px;
     text-align: center;
@@ -1572,7 +1600,11 @@ code {
         overflow-x: auto;
     }
 
+    .alumnos-filter-panel {
+        grid-template-columns: 1fr;
+    }
+
     .alumnos-attendance-table table {
-        min-width: 760px;
+        min-width: 920px;
     }
 }

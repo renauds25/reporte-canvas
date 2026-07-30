@@ -2,7 +2,9 @@ let reporteAlumnos = null;
 
 const ALUMNOS_TODAS_CARRERAS = "__TODAS_CARRERAS__";
 const alumnosRegistrosPorPagina = 20;
+const ALUMNOS_TODOS_TIPOS = "__TODOS_TIPOS__";
 let alumnosCarreraActiva = ALUMNOS_TODAS_CARRERAS;
+let alumnosTipoActivo = ALUMNOS_TODOS_TIPOS;
 let alumnosOrdenLista = "az";
 let alumnosPaginaActual = 1;
 let busquedaAlumnosResultados = [];
@@ -102,6 +104,12 @@ function tipoCumplimientoLabel(tipo) {
     if (tipo === "revalidado") return "Revalidado";
     if (tipo === "nuevo") return "Dato nuevo";
     return "Pendiente";
+}
+
+function tipoAlumnoBadgeClass(tipo) {
+    if (tipo === "revalidado") return "neutral";
+    if (tipo === "nuevo") return "success";
+    return "warning";
 }
 
 function tipoCursoLabel(curso) {
@@ -298,6 +306,27 @@ function renderAlumnosCareerFilter() {
     select.value = alumnosCarreraActiva;
 }
 
+function renderAlumnosTipoFilter() {
+    const select = document.getElementById("alumnosTipoSelect");
+    if (!select) return;
+
+    const opciones = [
+        [ALUMNOS_TODOS_TIPOS, "Todos"],
+        ["revalidado", "Revalidado"],
+        ["nuevo", "Dato nuevo"],
+        ["pendiente", "Pendiente"],
+    ];
+
+    if (!opciones.some(([value]) => value === alumnosTipoActivo)) {
+        alumnosTipoActivo = ALUMNOS_TODOS_TIPOS;
+    }
+
+    select.innerHTML = opciones
+        .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
+        .join("");
+    select.value = alumnosTipoActivo;
+}
+
 function ordenarFilasAlumnos(filas) {
     const ordenadores = {
         recientes: (a, b) => {
@@ -346,6 +375,12 @@ function ordenarFilasAlumnos(filas) {
             if (comparacionCarrera !== 0) return comparacionCarrera;
             return a.nombre.localeCompare(b.nombre, "es");
         },
+        tipo: (a, b) => {
+            const orden = { nuevo: 1, revalidado: 2, pendiente: 3 };
+            const comparacionTipo = (orden[a.tipo_cumplimiento] || 9) - (orden[b.tipo_cumplimiento] || 9);
+            if (comparacionTipo !== 0) return comparacionTipo;
+            return a.nombre.localeCompare(b.nombre, "es");
+        },
     };
 
     return [...filas].sort(ordenadores[alumnosOrdenLista] || ordenadores.az);
@@ -353,8 +388,12 @@ function ordenarFilasAlumnos(filas) {
 
 function getFilasAlumnos() {
     const filas = getAlumnosBase().map(crearFilaAlumno).filter((fila) => {
-        if (alumnosCarreraActiva === ALUMNOS_TODAS_CARRERAS) return true;
-        return normalizeText(getCarreraValue(fila.carrera)) === alumnosCarreraActiva;
+        const coincideCarrera = alumnosCarreraActiva === ALUMNOS_TODAS_CARRERAS
+            || normalizeText(getCarreraValue(fila.carrera)) === alumnosCarreraActiva;
+        const coincideTipo = alumnosTipoActivo === ALUMNOS_TODOS_TIPOS
+            || fila.tipo_cumplimiento === alumnosTipoActivo;
+
+        return coincideCarrera && coincideTipo;
     });
 
     return ordenarFilasAlumnos(filas);
@@ -372,16 +411,17 @@ function setAlumnosPagina(pagina) {
 
 function exportarListaAlumnos() {
     const filas = getFilasAlumnos();
-    const headers = ["id", "nombre", "carrera", "fecha"];
-    const rows = filas.map((fila) => [fila.id, fila.nombre, fila.carrera, fila.fecha]);
+    const headers = ["id", "nombre", "carrera", "tipo", "fecha"];
+    const rows = filas.map((fila) => [fila.id, fila.nombre, fila.carrera, tipoCumplimientoLabel(fila.tipo_cumplimiento), fila.fecha]);
     const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     const carrera = alumnosCarreraActiva === ALUMNOS_TODAS_CARRERAS ? "todas" : alumnosCarreraActiva.replace(/[^a-z0-9]+/g, "-");
+    const tipo = alumnosTipoActivo === ALUMNOS_TODOS_TIPOS ? "todos" : alumnosTipoActivo;
 
     link.href = url;
-    link.download = `reporte-alumnos-${carrera}-${alumnosOrdenLista}.csv`;
+    link.download = `reporte-alumnos-${carrera}-${tipo}-${alumnosOrdenLista}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -420,6 +460,7 @@ function renderListaAlumnos() {
                             <th class="col-id">ID</th>
                             <th class="col-nombre">Nombre</th>
                             <th class="col-carrera-alumno">Carrera</th>
+                            <th class="col-tipo-alumno">Tipo</th>
                             <th class="col-actualizacion">Fecha</th>
                         </tr>
                     </thead>
@@ -429,9 +470,10 @@ function renderListaAlumnos() {
                                 <td class="col-id">${escapeHtml(fila.id)}</td>
                                 <td class="col-nombre">${escapeHtml(fila.nombre)}</td>
                                 <td class="col-carrera-alumno">${escapeHtml(fila.carrera)}</td>
+                                <td class="col-tipo-alumno"><span class="badge ${tipoAlumnoBadgeClass(fila.tipo_cumplimiento)}">${escapeHtml(tipoCumplimientoLabel(fila.tipo_cumplimiento))}</span></td>
                                 <td class="col-actualizacion">${fila.completado ? escapeHtml(fila.fecha) : `<span class="table-status pending">${escapeHtml(fila.fecha)}</span>`}</td>
                             </tr>
-                        `).join("") : `<tr><td colspan="4" class="muted">No hay alumnos para los filtros seleccionados.</td></tr>`}
+                        `).join("") : `<tr><td colspan="5" class="muted">No hay alumnos para los filtros seleccionados.</td></tr>`}
                     </tbody>
                 </table>
             </div>
@@ -553,6 +595,7 @@ async function cargarReporteAlumnos() {
     renderResumen(reporteAlumnos);
     renderCurso(reporteAlumnos);
     renderAlumnosCareerFilter();
+    renderAlumnosTipoFilter();
     renderListaAlumnos();
 }
 
@@ -566,6 +609,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (careerSelect) {
         careerSelect.addEventListener("change", () => {
             alumnosCarreraActiva = careerSelect.value;
+            alumnosPaginaActual = 1;
+            renderListaAlumnos();
+        });
+    }
+
+    const tipoSelect = document.getElementById("alumnosTipoSelect");
+    if (tipoSelect) {
+        tipoSelect.value = alumnosTipoActivo;
+        tipoSelect.addEventListener("change", () => {
+            alumnosTipoActivo = tipoSelect.value;
             alumnosPaginaActual = 1;
             renderListaAlumnos();
         });

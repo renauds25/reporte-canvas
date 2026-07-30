@@ -90,6 +90,16 @@
                     </div>
                 </div>
 
+                <div class="filter-group type-filter-group">
+                    <p class="filter-label">Tipo</p>
+                    <select id="alumnosTipoSelect" class="search sort-select type-select" aria-label="Filtrar alumnos por tipo">
+                        <option value="__TODOS_TIPOS__">Todos</option>
+                        <option value="revalidado">Revalidado</option>
+                        <option value="nuevo">Dato nuevo</option>
+                        <option value="pendiente">Pendiente</option>
+                    </select>
+                </div>
+
                 <div class="list-toolbar alumnos-list-toolbar">
                     <label for="alumnosSortSelect">Ordenar por</label>
                     <select id="alumnosSortSelect" class="sort-select" aria-label="Ordenar lista de alumnos">
@@ -103,6 +113,7 @@
                         <option value="revalidados">Revalidados primero</option>
                         <option value="nuevos">Capacitados nuevos primero</option>
                         <option value="carrera">Carrera</option>
+                        <option value="tipo">Tipo</option>
                     </select>
                 </div>
             </div>
