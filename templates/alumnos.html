@@ -62,7 +62,16 @@
                 <div id="alumnosCursoResumen" class="summary-list progress-list"></div>
             </div>
         </section>
-
+        <section class="section">
+            <div class="section-title">
+                <div>
+                    <h2>Buscar alumno</h2>
+                    <p>Busca por nombre, ID o correo para ver su avance.</p>
+                </div>
+            </div>
+            <input id="alumnosSearchInput" class="search" type="search" placeholder="Ejemplo: 'Usuario', '12345' o 'correo@iest.edu.mx'">
+            <div id="alumnosSearchResults" class="search-results"></div>
+        </section>
         <section class="section alumnos-list-section">
             <div class="section-title alumnos-list-title">
                 <div>
@@ -101,16 +110,6 @@
             <div id="alumnosListaContent"></div>
         </section>
 
-        <section class="section">
-            <div class="section-title">
-                <div>
-                    <h2>Buscar alumno</h2>
-                    <p>Busca por nombre, ID o correo para ver su avance.</p>
-                </div>
-            </div>
-            <input id="alumnosSearchInput" class="search" type="search" placeholder="Ejemplo: 'Usuario', '12345' o 'correo@iest.edu.mx'">
-            <div id="alumnosSearchResults" class="search-results"></div>
-        </section>
     </main>
 
     <script src="{{ url_for('static', filename='js/alumnos.js') }}"></script>
