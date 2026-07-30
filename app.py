@@ -96,6 +96,7 @@ CURSOS_OFICIALES = [
     "CANVAS 4. RÚBRICAS.",
     "CANVAS 5. FOROS DE DISCUSIÓN.",
     "CANVAS 6. EXÁMENES Y SPEEDGRADER.",
+    "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA).",
 ]
 
 MODALIDADES_OFICIALES = [
@@ -607,6 +608,8 @@ def canonicalize_maestro_course(value: Any) -> str:
         if f"canvas {index}" in text_norm or f"canvas{index}" in text_norm or f"curso {index}" in text_norm:
             return official
 
+    if "induccion" in text_norm and ("docente" in text_norm or "materia en linea" in text_norm):
+        return CURSOS_OFICIALES[6]
     if "introduccion" in text_norm or "apuntes" in text_norm:
         return CURSOS_OFICIALES[0]
     if "tareas" in text_norm and "speedgrader" in text_norm:
@@ -934,7 +937,16 @@ def normalizar_curso_capacitacion_maestro(value: Any) -> str:
 
     mapa = {norm(nombre): nombre for nombre in CURSOS_OFICIALES}
     mapa[norm("CANVAS 5. FOROS DE DISCUSIÓN Y SPEEDGRADER.")] = "CANVAS 5. FOROS DE DISCUSIÓN."
-    return mapa.get(norm(curso), curso)
+    mapa[norm("CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA)")] = "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA)."
+    mapa[norm("CANVAS 7. INDUCCION PARA DOCENTES (MATERIA EN LINEA)")] = "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA)."
+    mapa[norm("INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA).")] = "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA)."
+    mapa[norm("INDUCCION PARA DOCENTES (MATERIA EN LINEA)")] = "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA)."
+
+    curso_norm = norm(curso)
+    if "induccion" in curso_norm and ("docente" in curso_norm or "materia en linea" in curso_norm):
+        return "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA)."
+
+    return mapa.get(curso_norm, curso)
 
 
 def curso_maestro_es_oficial(curso: str) -> bool:
@@ -2597,22 +2609,16 @@ def api_datos():
 
 
 @app.get("/alumnos")
-@report_login_required
-@login_required
 def alumnos():
     return render_template("alumnos.html", **template_context())
 
 
 @app.get("/api/alumnos/reporte")
-@report_login_required
-@login_required
 def api_alumnos_reporte():
     return jsonify(get_report_payload("alumno"))
 
 
 @app.get("/api/alumnos/datos")
-@report_login_required
-@login_required
 def api_alumnos_datos():
     rows, users = read_report_data("alumno")
     return jsonify({
