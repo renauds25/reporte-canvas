@@ -256,13 +256,45 @@ def get_value(row: dict[str, str], *keys: str) -> str:
     return ""
 
 
+def is_truthy_marker(value: Any) -> bool:
+    value_norm = norm(value)
+    return value_norm in {
+        "1",
+        "true",
+        "yes",
+        "si",
+        "sí",
+        "x",
+        "ml",
+        "materia en linea",
+        "materia en línea",
+        "en linea",
+        "en línea",
+        "online",
+    }
+
+
+def user_has_materia_linea(user: dict[str, Any] | None) -> bool:
+    if not user:
+        return False
+    return is_truthy_marker(
+        user.get("ml")
+        or user.get("ML")
+        or user.get("materia_linea")
+        or user.get("materia_en_linea")
+    )
+
+
 def normalize_user_row(row: dict[str, str]) -> dict[str, str]:
+    ml = get_value(row, "ml", "ML", "materia_linea", "materia en linea", "materia en línea", "materia_en_linea")
     return {
         "id": get_value(row, "id", "ID", "matricula", "matrícula", "numero", "número"),
         "nombre": get_value(row, "nombre", "Nombre", "name", "participante"),
         "correo": get_value(row, "correo", "Correo", "correo electronico", "correo electrónico", "Correo electrónico", "email", "mail", "e-mail"),
         "carrera": get_value(row, "carrera", "Carrera", "licenciatura", "Licenciatura", "programa", "Programa"),
         "division": get_value(row, "division", "División", "Division", "dirección", "Direccion", "area", "Área"),
+        "ml": "1" if is_truthy_marker(ml) else "0",
+        "materia_linea": is_truthy_marker(ml),
     }
 
 
@@ -2355,6 +2387,8 @@ def build_report(
             "correo": master_user["correo"] if master_user and master_user["correo"] else row["correo"],
             "carrera": master_user.get("carrera", "") if master_user and master_user.get("carrera") else row.get("carrera", ""),
             "division": master_user.get("division", "") if master_user and master_user.get("division") else row.get("division", ""),
+            "ml": "1" if user_has_materia_linea(master_user) else "0",
+            "materia_linea": user_has_materia_linea(master_user),
             "curso": row["curso"],
             "modalidad": row["modalidad"],
             "fecha_actualizacion": row["fecha_actualizacion"],
@@ -2378,6 +2412,8 @@ def build_report(
             "origen": resolved.get("origen", ""),
             "observacion": resolved.get("observacion", ""),
             "coincidencia": match_type,
+            "ml": resolved.get("ml", "0"),
+            "materia_linea": resolved.get("materia_linea", False),
         })
 
         # En alumnos, el reporte debe cruzarse contra la base activa.
@@ -2402,6 +2438,8 @@ def build_report(
                 "tiene_revalidacion": False,
                 "tiene_capacitacion_nueva": False,
                 "tipo_cumplimiento": "pendiente",
+                "ml": resolved.get("ml", "0"),
+                "materia_linea": bool(resolved.get("materia_linea")),
             }
 
         es_revalidado = es_revalidacion_alumno(resolved) if es_reporte_alumnos else False
@@ -2527,6 +2565,25 @@ def build_report(
         if cursos_1_y_2.issubset({norm(curso["curso"]) for curso in persona["cursos"]})
     )
 
+    curso_canvas7 = next(
+        (curso for curso in cursos_oficiales if norm(curso).startswith("canvas 7") or "induccion para docentes" in norm(curso)),
+        "",
+    )
+    curso_canvas7_norm = norm(curso_canvas7)
+    usuarios_materia_linea = [user for user in users if user_has_materia_linea(user)]
+    total_canvas7_materia_linea = len(usuarios_materia_linea)
+    canvas7_completados_materia_linea = sum(
+        1
+        for persona in personas_lista
+        if persona.get("materia_linea")
+        and curso_canvas7_norm
+        and any(norm(curso.get("curso")) == curso_canvas7_norm for curso in persona.get("cursos", []))
+    )
+    canvas7_porcentaje_materia_linea = porcentaje_sobre_total(
+        canvas7_completados_materia_linea,
+        total_canvas7_materia_linea,
+    )
+
     personas_pendientes_con_avance = sum(1 for persona in personas_lista if not persona["completo"])
 
     if users:
@@ -2548,6 +2605,10 @@ def build_report(
         "total_registros_filas": len(rows),
         "personas_completas": personas_completas,
         "personas_con_cursos_1_y_2": personas_con_cursos_1_y_2,
+        "curso_canvas7_materia_linea": curso_canvas7,
+        "total_canvas7_materia_linea": total_canvas7_materia_linea,
+        "canvas7_completados_materia_linea": canvas7_completados_materia_linea,
+        "canvas7_porcentaje_materia_linea": canvas7_porcentaje_materia_linea,
         "personas_pendientes": personas_pendientes,
         "personas_pendientes_con_avance": personas_pendientes_con_avance,
         "alumnos_revalidados": alumnos_revalidados,
@@ -2888,7 +2949,11 @@ def download_maestros_canvas7():
     }
 
     salida = []
-    usuarios_base = users or reporte.get("usuarios_lista", [])
+    usuarios_base = [
+        usuario
+        for usuario in (users or reporte.get("usuarios_lista", []))
+        if user_has_materia_linea(usuario)
+    ]
 
     for usuario in usuarios_base:
         usuario_id = clean(usuario.get("id"))
@@ -2909,6 +2974,7 @@ def download_maestros_canvas7():
             "correo": usuario_correo or (normalize_email(persona.get("correo")) if persona else ""),
             "carrera": clean(usuario.get("carrera")) or (clean(persona.get("carrera")) if persona else ""),
             "division": clean(usuario.get("division")) or (clean(persona.get("division")) if persona else ""),
+            "ml": "1",
             "curso": curso_canvas7,
             "estado": "Completo" if completado else "Pendiente",
             "fecha_actualizacion": registro_canvas7.get("fecha_actualizacion", "") if registro_canvas7 else "",
@@ -2925,6 +2991,7 @@ def download_maestros_canvas7():
         "correo",
         "carrera",
         "division",
+        "ml",
         "curso",
         "estado",
         "fecha_actualizacion",

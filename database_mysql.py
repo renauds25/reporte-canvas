@@ -33,6 +33,7 @@ from database import (
     normalizar_nombre_curso,
     obtener_valor,
     persona_key,
+    valor_booleano,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -180,6 +181,12 @@ def _crear_indice(conexion, sql: str) -> None:
         raise
 
 
+def _asegurar_columna_mysql(conexion, tabla: str, columna: str, definicion: str) -> None:
+    fila = ejecutar(conexion, f"SHOW COLUMNS FROM {tabla} LIKE :columna", {"columna": columna}).first()
+    if not fila:
+        ejecutar(conexion, f"ALTER TABLE {tabla} ADD COLUMN {columna} {definicion}")
+
+
 def inicializar_mysql(conexion) -> None:
     sentencias = [
         """
@@ -207,6 +214,7 @@ def inicializar_mysql(conexion) -> None:
             correo VARCHAR(255),
             carrera VARCHAR(255),
             division VARCHAR(255),
+            materia_linea TINYINT NOT NULL DEFAULT 0,
             creado_en VARCHAR(32) NOT NULL,
             CONSTRAINT fk_usuarios_base_persona FOREIGN KEY(persona_key) REFERENCES personas(persona_key)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -327,6 +335,8 @@ def inicializar_mysql(conexion) -> None:
 
     for sentencia in sentencias:
         ejecutar(conexion, sentencia)
+
+    _asegurar_columna_mysql(conexion, "usuarios_base", "materia_linea", "TINYINT NOT NULL DEFAULT 0")
 
     indices = [
         "CREATE INDEX idx_personas_tipo ON personas(tipo)",
@@ -730,6 +740,7 @@ def importar_usuarios_mysql(conexion, ruta: Path, tipo: str) -> int:
         correo = obtener_valor(fila, "correo", "correo electrónico", "email")
         carrera = obtener_valor(fila, "carrera")
         division = obtener_valor(fila, "division", "dirección", "direccion")
+        materia_linea = 1 if valor_booleano(obtener_valor(fila, "ml", "ML", "materia_linea", "materia en linea", "materia en línea", "materia_en_linea")) else 0
 
         if not any([id_externo, nombre, correo]):
             continue
@@ -748,9 +759,9 @@ def importar_usuarios_mysql(conexion, ruta: Path, tipo: str) -> int:
             conexion,
             """
             INSERT INTO usuarios_base (
-                tipo, persona_key, id_externo, nombre, correo, carrera, division, creado_en
+                tipo, persona_key, id_externo, nombre, correo, carrera, division, materia_linea, creado_en
             ) VALUES (
-                :tipo, :persona_key, :id_externo, :nombre, :correo, :carrera, :division, :creado_en
+                :tipo, :persona_key, :id_externo, :nombre, :correo, :carrera, :division, :materia_linea, :creado_en
             )
             """,
             {
@@ -761,6 +772,7 @@ def importar_usuarios_mysql(conexion, ruta: Path, tipo: str) -> int:
                 "correo": normalizar_correo(correo),
                 "carrera": limpiar(carrera) or "No disponible",
                 "division": limpiar(division) or "No disponible",
+                "materia_linea": materia_linea,
                 "creado_en": fecha_hora_actual(),
             },
         )
@@ -1016,7 +1028,7 @@ def leer_usuarios_reporte_mysql(tipo: str) -> list[dict[str, str]]:
         filas = ejecutar(
             conexion,
             """
-            SELECT id_externo, nombre, correo, carrera, division
+            SELECT id_externo, nombre, correo, carrera, division, materia_linea
             FROM usuarios_base
             WHERE tipo = :tipo
             ORDER BY nombre
@@ -1031,6 +1043,8 @@ def leer_usuarios_reporte_mysql(tipo: str) -> list[dict[str, str]]:
             "correo": normalizar_correo(fila["correo"]),
             "carrera": limpiar(fila["carrera"]) or "No disponible",
             "division": limpiar(fila["division"]) or "No disponible",
+            "ml": "1" if fila["materia_linea"] else "0",
+            "materia_linea": bool(fila["materia_linea"]),
         }
         for fila in filas
         if limpiar(fila["id_externo"]) or limpiar(fila["nombre"]) or limpiar(fila["correo"])

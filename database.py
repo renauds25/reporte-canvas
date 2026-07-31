@@ -115,6 +115,24 @@ def obtener_valor(fila: dict[str, Any], *claves: str) -> str:
     return ""
 
 
+def valor_booleano(valor: Any) -> bool:
+    valor_norm = normalizar(valor)
+    return valor_norm in {
+        "1",
+        "true",
+        "yes",
+        "si",
+        "sí",
+        "x",
+        "ml",
+        "materia en linea",
+        "materia en línea",
+        "en linea",
+        "en línea",
+        "online",
+    }
+
+
 def leer_csv(ruta: Path) -> list[dict[str, str]]:
     if not ruta.exists() or ruta.stat().st_size == 0:
         return []
@@ -236,6 +254,7 @@ def inicializar_bd(conexion: sqlite3.Connection) -> None:
             correo TEXT,
             carrera TEXT,
             division TEXT,
+            materia_linea INTEGER NOT NULL DEFAULT 0,
             creado_en TEXT NOT NULL,
             FOREIGN KEY(persona_key) REFERENCES personas(persona_key)
         );
@@ -369,6 +388,7 @@ def inicializar_bd(conexion: sqlite3.Connection) -> None:
         """
     )
     asegurar_columna(conexion, "personas", "es_base", "INTEGER NOT NULL DEFAULT 0")
+    asegurar_columna(conexion, "usuarios_base", "materia_linea", "INTEGER NOT NULL DEFAULT 0")
     conexion.execute("CREATE INDEX IF NOT EXISTS idx_personas_tipo_es_base ON personas(tipo, es_base)")
 
 
@@ -637,6 +657,7 @@ def importar_usuarios(conexion: sqlite3.Connection, ruta: Path, tipo: str) -> in
         correo = obtener_valor(fila, "correo", "correo electrónico", "email")
         carrera = obtener_valor(fila, "carrera")
         division = obtener_valor(fila, "division", "dirección", "direccion")
+        materia_linea = 1 if valor_booleano(obtener_valor(fila, "ml", "ML", "materia_linea", "materia en linea", "materia en línea", "materia_en_linea")) else 0
 
         if not any([id_externo, nombre, correo]):
             continue
@@ -654,8 +675,8 @@ def importar_usuarios(conexion: sqlite3.Connection, ruta: Path, tipo: str) -> in
         conexion.execute(
             """
             INSERT INTO usuarios_base (
-                tipo, persona_key, id_externo, nombre, correo, carrera, division, creado_en
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                tipo, persona_key, id_externo, nombre, correo, carrera, division, materia_linea, creado_en
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 limpiar(tipo).lower(),
@@ -665,6 +686,7 @@ def importar_usuarios(conexion: sqlite3.Connection, ruta: Path, tipo: str) -> in
                 normalizar_correo(correo),
                 limpiar(carrera) or "No disponible",
                 limpiar(division) or "No disponible",
+                materia_linea,
                 fecha_hora_actual(),
             ),
         )
@@ -795,7 +817,7 @@ def leer_usuarios_reporte(tipo: str, ruta: Path = DATABASE_PATH) -> list[dict[st
         inicializar_bd(conexion)
         filas = conexion.execute(
             """
-            SELECT id_externo, nombre, correo, carrera, division
+            SELECT id_externo, nombre, correo, carrera, division, materia_linea
             FROM usuarios_base
             WHERE tipo = ?
             ORDER BY nombre COLLATE NOCASE
@@ -810,6 +832,8 @@ def leer_usuarios_reporte(tipo: str, ruta: Path = DATABASE_PATH) -> list[dict[st
             "correo": normalizar_correo(fila["correo"]),
             "carrera": limpiar(fila["carrera"]) or "No disponible",
             "division": limpiar(fila["division"]) or "No disponible",
+            "ml": "1" if fila["materia_linea"] else "0",
+            "materia_linea": bool(fila["materia_linea"]),
         }
         for fila in filas
         if limpiar(fila["id_externo"]) or limpiar(fila["nombre"]) or limpiar(fila["correo"])

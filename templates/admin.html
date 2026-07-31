@@ -117,8 +117,9 @@
                         {% set canvas7.completados = total %}
                     {% endif %}
                 {% endfor %}
-                {% set total_canvas7 = reporte.total_usuarios_esperados or reporte.total_personas %}
-                {% set porcentaje_canvas7 = (canvas7.completados / total_canvas7 * 100) if total_canvas7 else 0 %}
+                {% set total_canvas7 = reporte.total_canvas7_materia_linea if reporte.total_canvas7_materia_linea is defined else (reporte.total_usuarios_esperados or reporte.total_personas) %}
+                {% set completados_canvas7 = reporte.canvas7_completados_materia_linea if reporte.canvas7_completados_materia_linea is defined else canvas7.completados %}
+                {% set porcentaje_canvas7 = (completados_canvas7 / total_canvas7 * 100) if total_canvas7 else 0 %}
                 {% set ancho_canvas7 = 100 if porcentaje_canvas7 > 100 else porcentaje_canvas7 %}
                 <div class="admin-course7-card">
                     <div class="admin-course7-header">
@@ -128,7 +129,7 @@
                         </div>
                         <div class="metric-column admin-course7-metric">
                             <strong id="adminCanvas7Porcentaje" class="metric-value">{{ '%.0f'|format(porcentaje_canvas7) }}%</strong>
-                            <small><span id="adminCanvas7Completados">{{ canvas7.completados }}</span> de <span id="adminCanvas7Total">{{ total_canvas7 }}</span></small>
+                            <small><span id="adminCanvas7Completados">{{ completados_canvas7 }}</span> de <span id="adminCanvas7Total">{{ total_canvas7 }}</span></small>
                         </div>
                     </div>
                     <div class="progress-track admin-course7-track" aria-label="CANVAS 7: {{ '%.0f'|format(porcentaje_canvas7) }}%">
@@ -314,8 +315,8 @@
                 return cursoNorm.startsWith("canvas 7") || cursoNorm.includes("induccion para docentes");
             }) || "CANVAS 7. INDUCCIÓN PARA DOCENTES (MATERIA EN LÍNEA).";
 
-            const total = Number(reporte.total_usuarios_esperados || reporte.total_personas || 0);
-            const completados = Number((reporte.conteo_por_curso || {})[cursoCanvas7] || 0);
+            const total = Number(reporte.total_canvas7_materia_linea || 0);
+            const completados = Number(reporte.canvas7_completados_materia_linea || 0);
             const porcentaje = total ? Math.min((completados / total) * 100, 100) : 0;
 
             const nombre = document.querySelector("#adminCanvas7Nombre");
