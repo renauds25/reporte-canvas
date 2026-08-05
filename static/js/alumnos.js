@@ -57,6 +57,17 @@ function getAlumnoKey(persona) {
     return String(persona?.id || persona?.correo || normalizeText(persona?.nombre) || "").trim();
 }
 
+
+function esAlumnoPerdido(persona) {
+    const texto = normalizeText(`${persona?.id || ""} ${persona?.nombre || ""} ${persona?.correo || ""} ${persona?.carrera || ""}`);
+    return (
+        texto.includes("alumno perdido") ||
+        texto.includes("sin-dato.local") ||
+        texto.includes("registro perdido") ||
+        /^999000\d{2}$/.test(String(persona?.id || "").trim())
+    );
+}
+
 function csvValue(value) {
     return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
@@ -271,11 +282,13 @@ function crearFilaAlumno(alumno) {
 function getCarrerasAlumnosDisponibles() {
     const carreras = new Map();
 
-    getAlumnosBase().forEach((alumno) => {
-        const carrera = getCarreraValue(alumno.carrera);
-        const key = normalizeText(carrera) || normalizeText("No disponible");
-        if (!carreras.has(key)) carreras.set(key, carrera);
-    });
+    getAlumnosBase()
+        .filter((alumno) => !esAlumnoPerdido(alumno))
+        .forEach((alumno) => {
+            const carrera = getCarreraValue(alumno.carrera);
+            const key = normalizeText(carrera) || normalizeText("No disponible");
+            if (!carreras.has(key)) carreras.set(key, carrera);
+        });
 
     return Array.from(carreras.values()).sort((a, b) => {
         if (normalizeText(a) === "no disponible") return 1;
@@ -387,7 +400,10 @@ function ordenarFilasAlumnos(filas) {
 }
 
 function getFilasAlumnos() {
-    const filas = getAlumnosBase().map(crearFilaAlumno).filter((fila) => {
+    const filas = getAlumnosBase()
+        .filter((alumno) => !esAlumnoPerdido(alumno))
+        .map(crearFilaAlumno)
+        .filter((fila) => {
         const coincideCarrera = alumnosCarreraActiva === ALUMNOS_TODAS_CARRERAS
             || normalizeText(getCarreraValue(fila.carrera)) === alumnosCarreraActiva;
         const coincideTipo = alumnosTipoActivo === ALUMNOS_TODOS_TIPOS
@@ -507,6 +523,8 @@ function renderResultados(query = "") {
     }
 
     const personas = getAlumnosBase().filter((persona) => {
+        if (esAlumnoPerdido(persona)) return false;
+
         const texto = normalizeText(`${persona.id} ${persona.nombre} ${persona.correo}`);
         return texto.includes(q);
     }).slice(0, 20);
