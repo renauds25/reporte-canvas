@@ -5,7 +5,7 @@ import re
 import sqlite3
 import unicodedata
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -155,18 +155,60 @@ def leer_csv(ruta: Path) -> list[dict[str, str]]:
     return []
 
 
-def fecha_iso(valor: Any) -> str:
+def _corregir_fecha_futura_invertida(fecha: datetime) -> datetime:
+    """Corrige fechas ambiguas que llegan en formato MM/DD/YYYY pero se leyeron como DD/MM/YYYY.
+
+    El caso observado en los reportes de Google/Sheets es que valores como 6/12/2026
+    representan 12 de junio, pero al interpretarse como día/mes terminan como
+    06 de diciembre. Solo se corrige cuando la fecha resultante queda en el futuro
+    cercano del mismo año y la fecha invertida ya ocurrió, para no afectar fechas
+    legítimas no ambiguas.
+    """
+    if not fecha or fecha == datetime.min:
+        return fecha
+
+    hoy = datetime.now()
+    limite_futuro = hoy + timedelta(days=7)
+
+    if (
+        fecha.year == hoy.year
+        and fecha.date() > limite_futuro.date()
+        and 1 <= fecha.day <= 12
+        and 1 <= fecha.month <= 12
+    ):
+        try:
+            invertida = datetime(fecha.year, fecha.day, fecha.month)
+        except ValueError:
+            return fecha
+
+        if invertida.date() <= limite_futuro.date():
+            return invertida
+
+    return fecha
+
+
+def _parse_fecha_capacitacion(valor: Any) -> datetime | None:
     texto = limpiar(valor)
     if not texto:
-        return ""
+        return None
 
-    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+    texto_fecha = texto.split()[0]
+
+    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%m/%d/%Y", "%m-%d-%Y"):
         try:
-            return datetime.strptime(texto, formato).strftime("%Y-%m-%d")
+            return _corregir_fecha_futura_invertida(datetime.strptime(texto_fecha, formato))
         except ValueError:
             continue
 
-    return texto
+    return None
+
+
+def fecha_iso(valor: Any) -> str:
+    fecha = _parse_fecha_capacitacion(valor)
+    if fecha:
+        return fecha.strftime("%Y-%m-%d")
+
+    return limpiar(valor)
 
 
 def fecha_hora_actual() -> str:
@@ -797,15 +839,11 @@ def resumen_bd(conexion: sqlite3.Connection) -> dict[str, int]:
 
 
 def fecha_para_reporte(valor: Any) -> str:
-    texto = limpiar(valor)
-    if not texto:
-        return ""
-    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
-        try:
-            return datetime.strptime(texto, formato).strftime("%d/%m/%Y")
-        except ValueError:
-            continue
-    return texto
+    fecha = _parse_fecha_capacitacion(valor)
+    if fecha:
+        return fecha.strftime("%d/%m/%Y")
+
+    return limpiar(valor)
 
 
 def leer_usuarios_reporte(tipo: str, ruta: Path = DATABASE_PATH) -> list[dict[str, str]]:

@@ -13,7 +13,7 @@ import unicodedata
 import urllib.error
 import urllib.request
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from functools import wraps
 from pathlib import Path
@@ -193,14 +193,48 @@ def normalize_email(value: Any) -> str:
     return clean(value).lower()
 
 
-def parse_date(value: str) -> datetime:
-    value = clean(value)
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+def correct_future_swapped_date(fecha: datetime) -> datetime:
+    if not fecha or fecha == datetime.min:
+        return fecha
+
+    hoy = mexico_now().replace(tzinfo=None)
+    limite_futuro = hoy + timedelta(days=7)
+
+    if (
+        fecha.year == hoy.year
+        and fecha.date() > limite_futuro.date()
+        and 1 <= fecha.day <= 12
+        and 1 <= fecha.month <= 12
+    ):
         try:
-            return datetime.strptime(value, fmt)
+            invertida = datetime(fecha.year, fecha.day, fecha.month)
+        except ValueError:
+            return fecha
+
+        if invertida.date() <= limite_futuro.date():
+            return invertida
+
+    return fecha
+
+
+def parse_training_date_value(value: Any) -> datetime | None:
+    text = clean(value)
+    if not text:
+        return None
+
+    date_text = text.split()[0]
+
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%m/%d/%Y", "%m-%d-%Y"):
+        try:
+            return correct_future_swapped_date(datetime.strptime(date_text, fmt))
         except ValueError:
             continue
-    return datetime.min
+
+    return None
+
+
+def parse_date(value: str) -> datetime:
+    return parse_training_date_value(value) or datetime.min
 
 
 def mexico_now() -> datetime:
@@ -396,13 +430,11 @@ def format_date_label(value: Any = "") -> str:
     value = clean(value)
 
     if not value:
-        return datetime.now().strftime("%d/%m/%Y")
+        return mexico_now().strftime("%d/%m/%Y")
 
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
-        try:
-            return datetime.strptime(value, fmt).strftime("%d/%m/%Y")
-        except ValueError:
-            continue
+    fecha = parse_training_date_value(value)
+    if fecha:
+        return fecha.strftime("%d/%m/%Y")
 
     return value
 
@@ -611,18 +643,7 @@ def parse_meet_subject_datetime(subject: str, fallback_timestamp_ms: str | None 
 
 
 def parse_date_value(value: Any) -> datetime | None:
-    value = clean(value)
-
-    if not value:
-        return None
-
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
-        try:
-            return datetime.strptime(value, fmt)
-        except ValueError:
-            continue
-
-    return None
+    return parse_training_date_value(value)
 
 
 def canonicalize_maestro_course(value: Any) -> str:

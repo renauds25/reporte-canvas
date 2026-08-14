@@ -72,20 +72,77 @@ function csvValue(value) {
     return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
+function fechaPartsToDate_(dia, mes, anio) {
+    const d = Number(dia);
+    const m = Number(mes);
+    const y = Number(anio);
+
+    if (!Number.isFinite(d) || !Number.isFinite(m) || !Number.isFinite(y)) return null;
+    if (d < 1 || d > 31 || m < 1 || m > 12 || y < 1900) return null;
+
+    const fecha = new Date(y, m - 1, d);
+    if (fecha.getFullYear() !== y || fecha.getMonth() !== m - 1 || fecha.getDate() !== d) return null;
+
+    return fecha;
+}
+
+function corregirFechaAmbigua_(dia, mes, anio) {
+    const original = fechaPartsToDate_(dia, mes, anio);
+    if (!original) return null;
+
+    const d = Number(dia);
+    const m = Number(mes);
+    const y = Number(anio);
+    const hoy = new Date();
+    const limiteFuturo = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 7);
+
+    if (
+        y === hoy.getFullYear() &&
+        original.getTime() > limiteFuturo.getTime() &&
+        d >= 1 && d <= 12 &&
+        m >= 1 && m <= 12
+    ) {
+        const invertida = fechaPartsToDate_(m, d, y);
+        if (invertida && invertida.getTime() <= limiteFuturo.getTime()) {
+            return { dia: m, mes: d, anio: y, fecha: invertida };
+        }
+    }
+
+    return { dia: d, mes: m, anio: y, fecha: original };
+}
+
+function padFecha_(value) {
+    return String(value).padStart(2, "0");
+}
+
 function formatFecha(fecha) {
     if (!fecha) return "";
 
     const texto = String(fecha).trim();
     if (!texto) return "";
 
-    if (texto.includes("/") && texto.includes(":")) return texto;
-    if (texto.includes("/") && !texto.includes("-")) return texto;
+    const [fechaTexto, horaTexto = ""] = texto.split(" ");
 
-    if (texto.includes("-")) {
-        const partes = texto.split("-");
+    if (fechaTexto.includes("/")) {
+        const partes = fechaTexto.split("/");
+        if (partes.length === 3) {
+            const corregida = corregirFechaAmbigua_(partes[0], partes[1], partes[2]);
+            if (corregida) {
+                const etiqueta = `${padFecha_(corregida.dia)}/${padFecha_(corregida.mes)}/${corregida.anio}`;
+                return horaTexto ? `${etiqueta} ${horaTexto}` : etiqueta;
+            }
+        }
+    }
+
+    if (fechaTexto.includes("-")) {
+        const partes = fechaTexto.split("-");
         if (partes.length === 3) {
             const [anio, mes, dia] = partes;
-            return `${dia}/${mes}/${anio}`;
+            const corregida = corregirFechaAmbigua_(dia, mes, anio);
+            if (corregida) {
+                const etiqueta = `${padFecha_(corregida.dia)}/${padFecha_(corregida.mes)}/${corregida.anio}`;
+                return horaTexto ? `${etiqueta} ${horaTexto}` : etiqueta;
+            }
         }
     }
 
@@ -99,13 +156,20 @@ function parseFechaOrden(fecha) {
     const fechaSinHora = texto.split(" ")[0];
 
     if (fechaSinHora.includes("/")) {
-        const [dia, mes, anio] = fechaSinHora.split("/").map(Number);
-        return new Date(anio, mes - 1, dia).getTime() || 0;
+        const partes = fechaSinHora.split("/");
+        if (partes.length === 3) {
+            const corregida = corregirFechaAmbigua_(partes[0], partes[1], partes[2]);
+            return corregida?.fecha?.getTime() || 0;
+        }
     }
 
     if (fechaSinHora.includes("-")) {
-        const [anio, mes, dia] = fechaSinHora.split("-").map(Number);
-        return new Date(anio, mes - 1, dia).getTime() || 0;
+        const partes = fechaSinHora.split("-");
+        if (partes.length === 3) {
+            const [anio, mes, dia] = partes;
+            const corregida = corregirFechaAmbigua_(dia, mes, anio);
+            return corregida?.fecha?.getTime() || 0;
+        }
     }
 
     return 0;
