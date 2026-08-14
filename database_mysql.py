@@ -670,6 +670,12 @@ def upsert_capacitacion_mysql(
             carrera = COALESCE(NULLIF(VALUES(carrera), ''), capacitaciones.carrera),
             division = COALESCE(NULLIF(VALUES(division), ''), capacitaciones.division),
             fecha_actualizacion = CASE
+                WHEN COALESCE(VALUES(fecha_actualizacion), '') = '' THEN capacitaciones.fecha_actualizacion
+                WHEN COALESCE(capacitaciones.fecha_actualizacion, '') = '' THEN VALUES(fecha_actualizacion)
+                WHEN LOWER(COALESCE(VALUES(fuente), '')) NOT IN ({CAPACITACIONES_API_FUENTES_SQL})
+                     AND DATE(capacitaciones.fecha_actualizacion) = CURDATE()
+                     AND DATE(VALUES(fecha_actualizacion)) < DATE(capacitaciones.fecha_actualizacion)
+                THEN VALUES(fecha_actualizacion)
                 WHEN COALESCE(VALUES(fecha_actualizacion), '') >= COALESCE(capacitaciones.fecha_actualizacion, '') THEN VALUES(fecha_actualizacion)
                 ELSE capacitaciones.fecha_actualizacion
             END,

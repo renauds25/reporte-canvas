@@ -430,13 +430,17 @@ def format_date_label(value: Any = "") -> str:
     value = clean(value)
 
     if not value:
-        return mexico_now().strftime("%d/%m/%Y")
+        return ""
 
     fecha = parse_training_date_value(value)
     if fecha:
         return fecha.strftime("%d/%m/%Y")
 
     return value
+
+
+def format_date_label_or_today(value: Any = "") -> str:
+    return format_date_label(value) or mexico_now().strftime("%d/%m/%Y")
 
 
 def write_csv(path: Path, rows: list[dict[str, Any]], headers: list[str]) -> None:
@@ -552,7 +556,7 @@ def parse_meet_subject_date(subject: str, fallback_timestamp_ms: str | None = No
         except (TypeError, ValueError):
             pass
 
-    return format_date_label()
+    return format_date_label_or_today()
 
 
 
@@ -1015,13 +1019,31 @@ def preparar_registros_capacitaciones_maestros(rows: list[dict[str, Any]], metad
     pendientes: list[dict[str, Any]] = []
     errores: list[dict[str, Any]] = []
 
-    fecha_default = format_date_label(metadata.get("fecha_actualizacion") or "") or mexico_now().strftime("%d/%m/%Y")
+    fecha_default = format_date_label(metadata.get("fecha_actualizacion") or "")
 
     for idx, raw in enumerate(rows, start=1):
         row = normalize_training_row(raw)
         curso = normalizar_curso_capacitacion_maestro(row.get("curso"))
         modalidad = normalizar_modalidad_capacitacion_maestro(row.get("modalidad"))
-        fecha_actualizacion = format_date_label(row.get("fecha_actualizacion") or fecha_default) or fecha_default
+        fecha_actualizacion = format_date_label(row.get("fecha_actualizacion") or fecha_default)
+
+        if not fecha_actualizacion:
+            pendientes.append({
+                "id": row.get("id", ""),
+                "nombre": row.get("nombre", ""),
+                "correo": normalize_email(row.get("correo")),
+                "carrera": row.get("carrera", "") or "No disponible",
+                "division": row.get("division", "") or "No disponible",
+                "curso": curso or row.get("curso", ""),
+                "modalidad": modalidad,
+                "fecha_actualizacion": "",
+                "duracion": "",
+                "minutos_num": "",
+                "motivo": "fecha_faltante",
+                "archivo_origen": metadata.get("filename", ""),
+                "hora_unio": "",
+            })
+            continue
 
         if not curso:
             errores.append({
@@ -1520,7 +1542,7 @@ def process_meet_csv_batch(
     descartados: list[dict[str, Any]] = []
 
     for source_path, fecha_actualizacion in source_files:
-        fecha_default = format_date_label(fecha_actualizacion)
+        fecha_default = format_date_label(fecha_actualizacion) or mexico_now().strftime("%d/%m/%Y")
 
         with source_path.open("r", encoding="utf-8-sig", newline="") as file:
             reader = csv.DictReader(file)
@@ -1642,7 +1664,7 @@ def process_meet_maestros_csv_batch(
         if not fecha_reunion_dt:
             fecha_reunion_dt = parse_date_value(fecha_reunion_label)
 
-        fecha_default = format_date_label(fecha_reunion_dt.strftime("%d/%m/%Y") if fecha_reunion_dt else fecha_reunion_label)
+        fecha_default = format_date_label(fecha_reunion_dt.strftime("%d/%m/%Y") if fecha_reunion_dt else fecha_reunion_label) or mexico_now().strftime("%d/%m/%Y")
 
         try:
             with source_path.open("r", encoding="utf-8-sig", newline="") as file:
