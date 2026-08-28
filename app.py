@@ -1945,25 +1945,170 @@ def write_report_update_timestamps(payload: dict[str, Any]) -> None:
     temp_path.replace(REPORT_UPDATE_TIMESTAMPS_PATH)
 
 
+def _timestamp_item_datetime(item: dict[str, Any]) -> datetime:
+    if not isinstance(item, dict):
+        return datetime.min
+
+    for key in ("actualizado_en_iso", "actualizado_en", "label"):
+        parsed = parse_datetime_flexible(item.get(key, ""))
+        if parsed != datetime.min:
+            return parsed
+
+    return datetime.min
+
+
+def _write_report_update_timestamp_mysql(tipo_norm: str, item: dict[str, Any]) -> None:
+    if not database_url_configurada():
+        return
+
+    try:
+        from database_mysql import crear_engine_mysql, ejecutar
+
+        engine = crear_engine_mysql()
+        with engine.begin() as conexion:
+            ejecutar(
+                conexion,
+                """
+                CREATE TABLE IF NOT EXISTS reporte_actualizaciones (
+                    tipo VARCHAR(32) PRIMARY KEY,
+                    label VARCHAR(64),
+                    origen VARCHAR(128),
+                    actualizado_en_iso VARCHAR(64),
+                    actualizado_en VARCHAR(64)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+            )
+            ejecutar(
+                conexion,
+                """
+                INSERT INTO reporte_actualizaciones (
+                    tipo, label, origen, actualizado_en_iso, actualizado_en
+                ) VALUES (
+                    :tipo, :label, :origen, :actualizado_en_iso, :actualizado_en
+                )
+                ON DUPLICATE KEY UPDATE
+                    label = VALUES(label),
+                    origen = VALUES(origen),
+                    actualizado_en_iso = VALUES(actualizado_en_iso),
+                    actualizado_en = VALUES(actualizado_en)
+                """,
+                {
+                    "tipo": tipo_norm,
+                    "label": clean(item.get("label", "")),
+                    "origen": clean(item.get("origen", "")),
+                    "actualizado_en_iso": clean(item.get("actualizado_en_iso", "")),
+                    "actualizado_en": clean(item.get("actualizado_en", "")),
+                },
+            )
+    except Exception as exc:
+        print(f"AVISO: No se pudo guardar timestamp de reporte en MySQL. Detalle: {exc}", file=sys.stderr)
+
+
+def _db_datetime_to_label(value: Any) -> str:
+    parsed = parse_datetime_flexible(value)
+    if parsed == datetime.min:
+        return ""
+
+    return parsed.strftime("%d/%m/%Y %H:%M")
+
+
+def _read_report_update_timestamp_mysql(tipo_norm: str) -> dict[str, Any]:
+    if not database_url_configurada():
+        return {}
+
+    try:
+        from database_mysql import crear_engine_mysql, ejecutar
+
+        engine = crear_engine_mysql()
+        with engine.connect() as conexion:
+            try:
+                row = ejecutar(
+                    conexion,
+                    """
+                    SELECT label, origen, actualizado_en_iso, actualizado_en
+                    FROM reporte_actualizaciones
+                    WHERE tipo = :tipo
+                    LIMIT 1
+                    """,
+                    {"tipo": tipo_norm},
+                ).mappings().first()
+            except Exception:
+                row = None
+
+            if row and clean(row.get("label", "")):
+                return {
+                    "label": clean(row.get("label", "")),
+                    "origen": clean(row.get("origen", "")) or "actualizacion_persistente_mysql",
+                    "actualizado_en_iso": clean(row.get("actualizado_en_iso", "")),
+                    "actualizado_en": clean(row.get("actualizado_en", "")),
+                }
+
+            # Respaldo para despliegues anteriores al timestamp persistente:
+            # si ya existen ingestas API en MySQL, usamos su fecha_descarga local.
+            tipo_db = "alumno" if tipo_norm == "alumno" else "maestro"
+            tipo_plural = "alumnos" if tipo_db == "alumno" else "maestros"
+            row = ejecutar(
+                conexion,
+                """
+                SELECT fecha_descarga, actualizado_en, origen
+                FROM ingestas
+                WHERE LOWER(COALESCE(tipo, '')) IN (:tipo_db, :tipo_plural)
+                  AND LOWER(COALESCE(origen, '')) IN ('api_directa', 'api_capacitaciones', 'api_capacitaciones_en_linea')
+                ORDER BY actualizado_en DESC, creado_en DESC
+                LIMIT 1
+                """,
+                {"tipo_db": tipo_db, "tipo_plural": tipo_plural},
+            ).mappings().first()
+
+            if row:
+                label = clean(row.get("fecha_descarga", "")) or _db_datetime_to_label(row.get("actualizado_en", ""))
+                if label:
+                    return {
+                        "label": label,
+                        "origen": clean(row.get("origen", "")) or "mysql_ingestas",
+                        "actualizado_en": clean(row.get("actualizado_en", "")),
+                    }
+
+    except Exception as exc:
+        print(f"AVISO: No se pudo leer timestamp de reporte desde MySQL. Detalle: {exc}", file=sys.stderr)
+
+    return {}
+
+
 def set_report_update_timestamp(tipo: str, label: str | None = None, origen: str = "actualizacion_explicita") -> str:
     tipo_norm = normalize_report_cache_tipo(tipo)
     label = label or mexico_now_label()
-    timestamps = read_report_update_timestamps()
-    timestamps[tipo_norm] = {
+    item = {
         "label": label,
         "origen": clean(origen) or "actualizacion_explicita",
         "actualizado_en_iso": datetime.now(ZoneInfo("America/Mexico_City")).isoformat(timespec="seconds"),
+        "actualizado_en": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+    timestamps = read_report_update_timestamps()
+    timestamps[tipo_norm] = item
     write_report_update_timestamps(timestamps)
+    _write_report_update_timestamp_mysql(tipo_norm, item)
     return label
 
 
 def get_report_update_timestamp_item(tipo: str) -> dict[str, Any]:
+    tipo_norm = normalize_report_cache_tipo(tipo)
     timestamps = read_report_update_timestamps()
-    item = timestamps.get(normalize_report_cache_tipo(tipo), {})
-    if isinstance(item, str):
-        return {"label": item, "origen": "actualizacion_explicita"}
-    return item if isinstance(item, dict) else {}
+    local_item = timestamps.get(tipo_norm, {})
+    if isinstance(local_item, str):
+        local_item = {"label": local_item, "origen": "actualizacion_explicita"}
+    if not isinstance(local_item, dict):
+        local_item = {}
+
+    mysql_item = _read_report_update_timestamp_mysql(tipo_norm)
+
+    if not mysql_item:
+        return local_item
+    if not local_item:
+        return mysql_item
+
+    return mysql_item if _timestamp_item_datetime(mysql_item) >= _timestamp_item_datetime(local_item) else local_item
 
 
 def apply_report_update_timestamp(tipo: str, reporte: dict[str, Any]) -> dict[str, Any]:
